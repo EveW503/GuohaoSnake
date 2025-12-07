@@ -1,0 +1,8 @@
+Intro EveW 410
+Advanced Player 200
+Advanced 666 200
+Intro Player1 170
+Advanced Player3 90
+Advanced Final Score: 60 60
+Intro Player1 30
+Intro Player2 10
