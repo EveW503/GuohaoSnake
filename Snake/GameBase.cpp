@@ -90,6 +90,10 @@ void GameBase::run() {
                     if (btn == 1) { // 暂停
                         is_paused = true;
                         pause_start = std::time(nullptr);
+
+                        int dt = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
+                        renderer.drawUI(current_score, highest_score, snake.getLength(), hp, dt, is_paused);
+
                         should_break_wait = true; // 标记需要跳出外层
                         break; // 跳出 MouseHit 循环
                     }
@@ -361,4 +365,15 @@ void ExpertGame::onSnakeDie()
             }
         }
     }
+
+    if (success)
+    {
+        snake.reset(x, y);
+        food.generateFood(map);
+    }
+    else
+    {
+        is_game_over = true;
+    }
+
 }

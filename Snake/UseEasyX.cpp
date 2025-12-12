@@ -222,7 +222,7 @@ std::string UseEasyX::inputPlayerName()
 {
     // 这里的 InputBox 是 EasyX 封装的 Windows API
     // 参数：接收字符串的缓冲区, 缓冲区大小, 提示文本, 标题, 默认值, ...
-    TCHAR str_buf[32];
+    TCHAR str_buf[32] = { 0 };
     InputBox(str_buf, 32, _T("Please enter your name:"), _T("New Record"), _T("Player"), 0, 0, false);
 
     // TCHAR 转 std::string (处理 Unicode/多字节问题)
@@ -281,12 +281,20 @@ void UseEasyX::drawRankings(const std::vector<Record>& records)
         outtextxy(200, y, ver_buf);
 
         // 名字
-        TCHAR name_buf[32];
-        _stprintf_s(name_buf, _T("%S"), rec.user_name.c_str());
+        TCHAR name_buf[128];
+
+        // 1. 截断保护：无论名字多长，只取前 20 个字符
+        std::string safe_name = rec.user_name;
+        if (safe_name.length() > 20) {
+            safe_name = safe_name.substr(0, 20) + "..."; // 超长截断并加省略号
+        }
+
+        // 2. 使用截断后的 safe_name 进行绘制
+        _stprintf_s(name_buf, _T("%S"), safe_name.c_str());
         outtextxy(500, y, name_buf);
 
         // 分数
-        TCHAR score_buf[32];
+        TCHAR score_buf[128];
         _stprintf_s(score_buf, _T("%d"), rec.score);
         outtextxy(900, y, score_buf);
 
