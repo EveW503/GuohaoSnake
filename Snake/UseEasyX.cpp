@@ -3,10 +3,22 @@
 #include <vector>
 #include <cstdio>  // 用于 swprintf_s
 #include <windows.h> // 用于 Sleep, GetAsyncKeyState
+#include <stdio.h>
+#include <graphics.h>
+
+
 
 // 辅助宏：将逻辑坐标转为屏幕像素坐标
 #define GET_X(x) ((x) * BLOCK_SIZE)
 #define GET_Y(y) ((y) * BLOCK_SIZE)
+
+// 定义游戏内按钮的位置 (右上角)
+const int BTN_W = 100;
+const int BTN_H = 30;
+const int BTN_RETURN_X = SCREEN_WIDTH - 120; // 返回按钮 X
+const int BTN_RETURN_Y = 10;
+const int BTN_PAUSE_X = SCREEN_WIDTH - 240;  // 暂停按钮 X
+const int BTN_PAUSE_Y = 10;
 
 void UseEasyX::initGraph(int width, int height)
 {
@@ -87,26 +99,46 @@ void UseEasyX::drawSnake(const std::deque<Point>& snake_body)
     solidcircle(hx + BLOCK_SIZE * 3 / 4, hy + BLOCK_SIZE / 4, 3);
 }
 
-void UseEasyX::drawUI(int current_score, int high_score, int snake_len, int hp, int game_time_seconds)
-{
+void UseEasyX::drawUI(int current_score, int high_score, int snake_len, int hp, int game_time_seconds, bool is_paused) {
+    // 1. 绘制基本文字信息
     settextcolor(WHITE);
     settextstyle(24, 0, _T("Consolas"));
 
     TCHAR str_buf[128];
-
-    // 分数
     _stprintf_s(str_buf, _T("Score: %d  High: %d"), current_score, high_score);
     outtextxy(20, 20, str_buf);
 
-    // 长度与时间
     _stprintf_s(str_buf, _T("Length: %d  Time: %02d:%02d"), snake_len, game_time_seconds / 60, game_time_seconds % 60);
     outtextxy(20, 50, str_buf);
 
-    // 生命值
     if (hp > 0) {
         settextcolor(LIGHTRED);
         _stprintf_s(str_buf, _T("HP: %d"), hp);
         outtextxy(20, 80, str_buf);
+    }
+
+    // 2. 【修改】绘制功能按钮 (根据暂停状态改变文字和颜色)
+    // 如果暂停：显示 "RESUME" (继续)，背景绿色
+    // 如果运行：显示 "PAUSE" (暂停)，背景棕色
+    drawButton(BTN_PAUSE_X, BTN_PAUSE_Y, BTN_W, BTN_H,
+        is_paused ? _T("RESUME") : _T("PAUSE"),
+        is_paused ? GREEN : BROWN);
+
+    drawButton(BTN_RETURN_X, BTN_RETURN_Y, BTN_W, BTN_H, _T("MENU"), RED);
+
+    // 3. 【新增】绘制屏幕中央的暂停提示
+    if (is_paused) {
+        // 设置大号字体
+        settextstyle(80, 0, _T("Arial"));
+        settextcolor(YELLOW);
+
+        LPCTSTR p_text = _T("GAME PAUSED");
+
+        // 计算居中位置
+        int text_w = textwidth(p_text);
+        int text_h = textheight(p_text);
+
+        outtextxy((SCREEN_WIDTH - text_w) / 2, (SCREEN_HEIGHT - text_h) / 2, p_text);
     }
 
     FlushBatchDraw();
@@ -145,47 +177,43 @@ void UseEasyX::drawGameOver(int final_score)
     FlushBatchDraw();
 }
 
-int UseEasyX::drawMenu()
-{
-    cleardevice();
+int UseEasyX::drawMenu() {
+    int btn_w = 300;
+    int btn_h = 50;
+    int start_y = 200; // 按钮起始高度
+    int gap = 70;      // 按钮间距
+    int center_x = (SCREEN_WIDTH - btn_w) / 2;
 
-    // 计算屏幕中心 X
-    int center_x = SCREEN_WIDTH / 2;
-
-    // --- 1. 标题 ---
-    settextstyle(60, 0, _T("Arial"));
-    settextcolor(YELLOW);
-    LPCTSTR title = _T("SNAKE GAME C++");
-    // 动态居中：(屏幕宽 - 文字宽) / 2
-    // Y 轴设为 80 (适配 720P)
-    outtextxy(center_x - textwidth(title) / 2, 80, title);
-
-    // --- 2. 选项 ---
-    settextstyle(30, 0, _T("Consolas")); // 字体稍微改小
-    settextcolor(WHITE);
-
-    // 定义选项内容
-    LPCTSTR opt1 = _T("1. Intro Mode (Basic)");
-    LPCTSTR opt2 = _T("2. Advanced Mode (Body -> Wall)");
-    LPCTSTR opt3 = _T("3. Expert Mode (Body -> Food)");
-
-    // 动态计算每个选项的居中位置，并且 Y 轴更紧凑
-    outtextxy(center_x - textwidth(opt1) / 2, 240, opt1);
-    outtextxy(center_x - textwidth(opt2) / 2, 300, opt2);
-    outtextxy(center_x - textwidth(opt3) / 2, 360, opt3);
-
-    // --- 3. 提示 ---
-    settextcolor(LIGHTGRAY);
-    LPCTSTR prompt = _T("Please press 1, 2, or 3 to start...");
-    outtextxy(center_x - textwidth(prompt) / 2, 500, prompt);
-
-    FlushBatchDraw();
-
-    // 输入循环 (使用 GetAsyncKeyState 避免焦点问题)
     while (true) {
-        if (GetAsyncKeyState('1') & 0x8000) return 1;
-        if (GetAsyncKeyState('2') & 0x8000) return 2;
-        if (GetAsyncKeyState('3') & 0x8000) return 3;
+        cleardevice();
+
+        // 1. 标题
+        settextstyle(60, 0, _T("Arial"));
+        settextcolor(YELLOW);
+        LPCTSTR title = _T("SNAKE GAME C++");
+        outtextxy((SCREEN_WIDTH - textwidth(title)) / 2, 80, title);
+
+        // 2. 绘制 5 个按钮
+        drawButton(center_x, start_y, btn_w, btn_h, _T("1. Intro Mode"), GREEN);
+        drawButton(center_x, start_y + gap, btn_w, btn_h, _T("2. Advanced Mode"), BLUE);
+        drawButton(center_x, start_y + gap * 2, btn_w, btn_h, _T("3. Expert Mode"), RED);
+        drawButton(center_x, start_y + gap * 3, btn_w, btn_h, _T("History Records"), LIGHTGRAY);
+        drawButton(center_x, start_y + gap * 4, btn_w, btn_h, _T("Exit Game"), DARKGRAY);
+
+        FlushBatchDraw();
+
+        // 3. 鼠标交互
+        if (MouseHit()) {
+            MOUSEMSG msg = GetMouseMsg();
+            if (msg.uMsg == WM_LBUTTONDOWN) {
+                // 判断点击了哪个按钮
+                if (isClickIn(msg.x, msg.y, center_x, start_y, btn_w, btn_h)) return 1;
+                if (isClickIn(msg.x, msg.y, center_x, start_y + gap, btn_w, btn_h)) return 2;
+                if (isClickIn(msg.x, msg.y, center_x, start_y + gap * 2, btn_w, btn_h)) return 3;
+                if (isClickIn(msg.x, msg.y, center_x, start_y + gap * 3, btn_w, btn_h)) return 4; // 历史
+                if (isClickIn(msg.x, msg.y, center_x, start_y + gap * 4, btn_w, btn_h)) return 5; // 退出
+            }
+        }
         Sleep(10);
     }
 }
@@ -276,6 +304,89 @@ void UseEasyX::drawRankings(const std::vector<Record>& records)
     // 等待按键
     while (true) {
         if (GetAsyncKeyState(VK_SPACE) & 0x8000) break;
+        Sleep(10);
+    }
+}
+
+void UseEasyX::drawButton(int x, int y, int w, int h, LPCTSTR text, COLORREF bg_color) {
+    setfillcolor(bg_color);
+    setlinecolor(WHITE);
+    fillrectangle(x, y, x + w, y + h); // 画带边框的矩形
+
+    setbkmode(TRANSPARENT);
+    settextcolor(WHITE);
+    settextstyle(20, 0, _T("Consolas"));
+
+    // 文字居中计算
+    int tx = x + (w - textwidth(text)) / 2;
+    int ty = y + (h - textheight(text)) / 2;
+    outtextxy(tx, ty, text);
+}
+
+bool UseEasyX::isClickIn(int mouse_x, int mouse_y, int x, int y, int w, int h) {
+    return (mouse_x >= x && mouse_x <= x + w && mouse_y >= y && mouse_y <= y + h);
+}
+
+int UseEasyX::checkGameButtons(int mouse_x, int mouse_y) {
+    if (isClickIn(mouse_x, mouse_y, BTN_PAUSE_X, BTN_PAUSE_Y, BTN_W, BTN_H)) return 1; // 暂停
+    if (isClickIn(mouse_x, mouse_y, BTN_RETURN_X, BTN_RETURN_Y, BTN_W, BTN_H)) return 2; // 返回
+    return 0;
+}
+
+// 绘制历史记录 (带返回按钮)
+void UseEasyX::drawHistory(const std::vector<Record>& records) {
+    int btn_w = 150;
+    int btn_x = (SCREEN_WIDTH - btn_w) / 2;
+    int btn_y = SCREEN_HEIGHT - 80;
+
+    while (true) {
+        cleardevice();
+
+        // 标题
+        settextstyle(50, 0, _T("Arial"));
+        settextcolor(YELLOW);
+        LPCTSTR title = _T("HALL OF FAME");
+        outtextxy((SCREEN_WIDTH - textwidth(title)) / 2, 50, title);
+
+        // 表头
+        settextstyle(30, 0, _T("Consolas"));
+        settextcolor(LIGHTCYAN);
+        outtextxy(200, 150, _T("VERSION"));
+        outtextxy(500, 150, _T("NAME"));
+        outtextxy(900, 150, _T("SCORE"));
+
+        // 列表
+        settextcolor(WHITE);
+        int y = 200;
+        int count = 0;
+        for (const auto& rec : records) {
+            if (count >= 10) break;
+
+            TCHAR buf[128];
+            _stprintf_s(buf, _T("%-15S"), rec.version.c_str());
+            outtextxy(200, y, buf);
+            _stprintf_s(buf, _T("%-15S"), rec.user_name.c_str());
+            outtextxy(500, y, buf);
+            _stprintf_s(buf, _T("%d"), rec.score);
+            outtextxy(900, y, buf);
+
+            y += 40;
+            count++;
+        }
+
+        // 绘制返回按钮
+        drawButton(btn_x, btn_y, btn_w, 50, _T("BACK"), DARKGRAY);
+
+        FlushBatchDraw();
+
+        // 鼠标检测
+        if (MouseHit()) {
+            MOUSEMSG msg = GetMouseMsg();
+            if (msg.uMsg == WM_LBUTTONDOWN) {
+                // 点击返回按钮退出
+                if (isClickIn(msg.x, msg.y, btn_x, btn_y, btn_w, 50)) break;
+            }
+        }
         Sleep(10);
     }
 }

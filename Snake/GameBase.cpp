@@ -1,6 +1,8 @@
 #include "GameBase.h"
 #include <conio.h>   // 用于 _kbhit
 #include <windows.h>
+#include <stdio.h>
+#include <graphics.h>
 
 GameBase::GameBase()
 {
@@ -11,96 +13,122 @@ GameBase::GameBase()
 	start_time = 0;
 }
 
-void GameBase::run()
-{
-    // 1. 系统初始化
+void GameBase::run() {
     renderer.initGraph(SCREEN_WIDTH, SCREEN_HEIGHT);
     record_mgr.loadRecords();
+    highest_score = record_mgr.getHighestScore(getVersionName());
 
-    // 默认加载 Intro 版本的最高分 (具体版本 key 可由子类重写或动态判断)
-    highest_score = record_mgr.getHighestScore("Intro");
-
-    // 2. 游戏逻辑初始化
     start_time = std::time(nullptr);
-
-    // 初始化食物 (传入地图引用)
     food.generateFood(map);
 
-    // 【关键同步】: 游戏开始前，将蛇的初始位置同步到地图上
-    // 注意：需要 Snake 类提供 getBody() 接口
+    // 初始化蛇位置
     const std::deque<Point>& initial_body = snake.getBody();
-    for (const auto& p : initial_body) 
-    {
-        map.setBlock(BlockType::SNAKE_BODY, p.x, p.y);
-    }
-    // 修正蛇头
-    if (!initial_body.empty()) 
-    {
-        map.setBlock(BlockType::SNAKE_HEAD, initial_body.front().x, initial_body.front().y);
-    }
+    for (const auto& p : initial_body) map.setBlock(BlockType::SNAKE_BODY, p.x, p.y);
+    if (!initial_body.empty()) map.setBlock(BlockType::SNAKE_HEAD, initial_body.front().x, initial_body.front().y);
 
-    while (!is_game_over)
-    {
-        // --- A. 输入处理 ---
-// 我们不再使用一次 Sleep(150)，而是将其拆分为多个 10ms 的小片段
-        // 在等待的间隙中不断检测键盘，彻底解决延迟和吞键问题
+    bool is_paused = false;
+    long long pause_duration = 0;
+    long long pause_start = 0;
 
+    // 主循环
+    while (!is_game_over) {
+
+        // --- 1. 处理鼠标点击 (按钮) ---
+        // 使用 while 循环清空消息队列，解决点击不灵敏问题
+        while (MouseHit()) {
+            MOUSEMSG msg = GetMouseMsg();
+            if (msg.uMsg == WM_LBUTTONDOWN) {
+                int action = renderer.checkGameButtons(msg.x, msg.y);
+
+                if (action == 1) { // 暂停/继续
+                    is_paused = !is_paused;
+                    if (is_paused) {
+                        pause_start = std::time(nullptr);
+                    }
+                    else {
+                        pause_duration += (std::time(nullptr) - pause_start);
+                    }
+                    // 立即重绘一次UI
+                    int dt = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
+                    renderer.drawUI(current_score, highest_score, snake.getLength(), hp, dt, is_paused);
+                }
+                else if (action == 2) { // 立即退出
+                    renderer.close();
+                    return; // 直接结束 run 函数
+                }
+            }
+        }
+
+        // --- 2. 暂停状态 ---
+        if (is_paused) {
+            Sleep(100);
+            continue;
+        }
+
+        // --- 3. 正常游戏逻辑 ---
         int frame_wait_time = 150 - (current_score / 5);
         if (frame_wait_time < 50) frame_wait_time = 50;
 
-        // 获取当前蛇的方向，用于防止掉头
-        // 注意：你需要确保 Snake 类有 getDirection() 接口
         Direction current_dir = snake.getDirection();
+        DWORD start_tick = GetTickCount();
 
-        // 开始一段等待时间，期间持续检测输入
-        long long start_tick = GetTickCount();
-        while (GetTickCount() - start_tick < frame_wait_time) {
+        // 等待期间检测输入 (非阻塞延时)
+        while (GetTickCount() - start_tick < (DWORD)frame_wait_time) {
+            // 键盘控制
+            if ((GetAsyncKeyState('W') & 0x8000) && current_dir != Direction::DOWN) snake.setDirection(Direction::UP);
+            else if ((GetAsyncKeyState('S') & 0x8000) && current_dir != Direction::UP) snake.setDirection(Direction::DOWN);
+            else if ((GetAsyncKeyState('A') & 0x8000) && current_dir != Direction::RIGHT) snake.setDirection(Direction::LEFT);
+            else if ((GetAsyncKeyState('D') & 0x8000) && current_dir != Direction::LEFT) snake.setDirection(Direction::RIGHT);
 
-            // --- [修复2：防自杀判断] ---
-            // 禁止直接向相反方向移动 (例如：当前向上，禁止向下)
+            // 【关键修复】等待期间也要检测鼠标
+            bool should_break_wait = false; // 标记是否需要跳出等待循环
 
-            if ((GetAsyncKeyState('W') & 0x8000) && current_dir != Direction::DOWN) {
-                snake.setDirection(Direction::UP);
-            }
-            else if ((GetAsyncKeyState('S') & 0x8000) && current_dir != Direction::UP) {
-                snake.setDirection(Direction::DOWN);
-            }
-            else if ((GetAsyncKeyState('A') & 0x8000) && current_dir != Direction::RIGHT) {
-                snake.setDirection(Direction::LEFT);
-            }
-            else if ((GetAsyncKeyState('D') & 0x8000) && current_dir != Direction::LEFT) {
-                snake.setDirection(Direction::RIGHT);
+            while (MouseHit()) {
+                MOUSEMSG msg = GetMouseMsg();
+                if (msg.uMsg == WM_LBUTTONDOWN) {
+                    int btn = renderer.checkGameButtons(msg.x, msg.y);
+                    if (btn == 1) { // 暂停
+                        is_paused = true;
+                        pause_start = std::time(nullptr);
+                        should_break_wait = true; // 标记需要跳出外层
+                        break; // 跳出 MouseHit 循环
+                    }
+                    if (btn == 2) { // 退出
+                        renderer.close();
+                        return; // 直接返回
+                    }
+                }
             }
 
-            Sleep(10); // 每 10ms 检查一次输入，极其丝滑
+            // 如果点击了暂停，跳出等待循环，让主循环处理暂停逻辑
+            if (should_break_wait) {
+                break;
+            }
+
+            Sleep(10);
         }
 
-        // --- B. 逻辑更新 ---
+        // 如果触发了暂停，直接跳过本次 update/render，进入下一次主循环
+        if (is_paused) continue;
+
         update();
 
-        // --- C. 画面渲染 ---
-        render();
+        // 渲染
+        int display_time = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
+        renderer.drawMap(map);
+        renderer.drawSnake(snake.getBody());
+        renderer.drawUI(current_score, highest_score, snake.getLength(), hp, display_time, false);
     }
 
-    // 4. 游戏结束处理
+    // 游戏结束结算
     renderer.drawGameOver(current_score);
 
     Sleep(500);
 
-    // 2. 【修复3：输入名字】弹出输入框
-    // 此时不需要检测键盘，InputBox 会阻塞并获取焦点
     std::string player_name = renderer.inputPlayerName();
-
-    // 3. 【修复2：正确版本名】保存记录
-    // 如果玩家没输名字，给个默认值
     if (player_name.empty()) player_name = "Anonymous";
-
-    // 使用 getVersionName() 获取当前真正的版本 (Intro/Advanced/Expert)
     record_mgr.addRecord(getVersionName(), player_name, current_score);
 
-    // 4. 【修复1：显示历史】绘制排行榜
-    // 重新加载最新记录（包含刚存进去的这条）
-    // record_mgr.loadRecords(); // addRecord 内部如果已经保存了，这里其实不需要 reload，直接取就行
     renderer.drawRankings(record_mgr.getAllRecords());
     renderer.close();
 }
@@ -183,7 +211,7 @@ void GameBase::render()
     renderer.drawMap(map);
     // 注意：drawSnake 需要 const deque<Point>& 参数
     renderer.drawSnake(snake.getBody());
-    renderer.drawUI(current_score, highest_score, len, hp, duration);
+    renderer.drawUI(current_score, highest_score, len, hp, duration, false);
 }
 
 // --- IntroGame (入门版) 实现 ---
@@ -273,8 +301,18 @@ ExpertGame::ExpertGame() {
 
 void ExpertGame::onSnakeDie()
 {
+    // 1. 尸身变食物
+    const std::deque<Point>& body = snake.getBody();
+    for (const auto& p : body)
+    {
+        // 将身体变成食物，注意：这些食物属于额外奖励，不计入FoodManager的数量管理
+        map.setBlock(BlockType::FOOD, p.x, p.y);
+    }
+
+
     death_count++;
     hp--; // 更新UI显示的血量
+
 
     // 超过5次死亡，游戏彻底结束
     if (death_count >= 5) 
@@ -283,13 +321,6 @@ void ExpertGame::onSnakeDie()
         return;
     }
 
-    // 1. 尸身变食物
-    const std::deque<Point>& body = snake.getBody();
-    for (const auto& p : body)
-    {
-        // 将身体变成食物，注意：这些食物属于额外奖励，不计入FoodManager的数量管理
-        map.setBlock(BlockType::FOOD, p.x, p.y);
-    }
 
     // 2. 尝试重生
     static std::mt19937 rng(static_cast<unsigned int>(std::time(nullptr)));
