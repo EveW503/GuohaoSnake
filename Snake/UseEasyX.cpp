@@ -8,8 +8,6 @@
 #include <ctime>
 #include <cstdlib>
 
-
-
 // 辅助宏：将逻辑坐标转为屏幕像素坐标
 #define GET_X(x) ((x) * BLOCK_SIZE)
 #define GET_Y(y) ((y) * BLOCK_SIZE)
@@ -24,8 +22,9 @@ const int BTN_PAUSE_Y = 10;
 
 bool UseEasyX::is_graph_initialized = false;
 
-// 辅助函数：获取鼠标位置（用于悬停效果，不消耗点击事件）
-POINT getMousePos() {
+// 辅助函数：获取鼠标位置（用于悬停效果）
+POINT getMousePos()
+{
     POINT p;
     GetCursorPos(&p);
     ScreenToClient(GetHWnd(), &p);
@@ -56,36 +55,35 @@ void UseEasyX::close()
 
 void UseEasyX::drawMap(GameMap& map)
 {
-    // 每次清除屏幕使用深色背景
     setbkcolor(VA_BG_COLOR);
     cleardevice();
 
-    // 可选：绘制淡淡的背景网格线，增加赛博感
+    // 绘制背景网格线
     setlinecolor(RGB(35, 30, 50));
     for (int i = 0; i < SCREEN_WIDTH; i += BLOCK_SIZE) line(i, 0, i, SCREEN_HEIGHT);
     for (int j = 0; j < SCREEN_HEIGHT; j += BLOCK_SIZE) line(0, j, SCREEN_WIDTH, j);
 
-    for (int x = 0; x < MAP_WIDTH; x++) {
-        for (int y = 0; y < MAP_HEIGHT; y++) {
+    for (int x = 0; x < MAP_WIDTH; x++) 
+    {
+        for (int y = 0; y < MAP_HEIGHT; y++) 
+        {
             BlockType type = map.getBlock(x, y);
 
             int sx = GET_X(x);
             int sy = GET_Y(y);
 
-            switch (type) {
+            switch (type) 
+            {
             case BlockType::WALL:
                 // 墙壁：空心矩形或带边框的深色块
                 setfillcolor(VA_WALL_COLOR);
                 setlinecolor(VA_WALL_BORDER);
                 fillrectangle(sx, sy, sx + BLOCK_SIZE, sy + BLOCK_SIZE);
-                // 画个叉或者内部装饰，看起来像原本的电子元件
                 line(sx, sy, sx + BLOCK_SIZE, sy + BLOCK_SIZE);
                 break;
 
             case BlockType::FOOD:
             {
-                // --- 赛博朋克风格：全息能量核心 ---
-
                 // 1. 计算呼吸动画参数 (基于系统时间)
                 // 周期约 1秒，范围 0.0 ~ 1.0
                 long long t = GetTickCount();
@@ -136,8 +134,6 @@ void UseEasyX::drawMap(GameMap& map)
 
             case BlockType::DATA_FRAG:
             {
-                // --- 赛博故障风格设计 ---
-
                 // 1. 定义颜色：高亮金
                 COLORREF neon_gold = RGB(255, 215, 0);
 
@@ -145,7 +141,7 @@ void UseEasyX::drawMap(GameMap& map)
                 // 边框会随机向外扩散或收缩 1-2 像素，产生视觉上的震动感
                 int jitter = rand() % 3;
                 setlinecolor(neon_gold);
-                setfillcolor(BS_NULL); // 设为空心，防止覆盖背景网格太多
+                setfillcolor(BS_NULL); 
 
                 // 画主框
                 rectangle(sx + 5 - jitter, sy + 5 - jitter,
@@ -162,7 +158,7 @@ void UseEasyX::drawMap(GameMap& map)
                 }
 
                 // 4. 绘制文字标识
-                // 文字偶尔会变成乱码颜色或者消失，增加 Glitch 感
+                // 文字偶尔会变成乱码颜色或者消失
                 if (rand() % 10 != 0) { // 90% 时间正常显示
                     settextcolor(neon_gold);
                     settextstyle(14, 0, _T("Consolas")); // 使用极小的终端字体
@@ -186,18 +182,19 @@ void UseEasyX::drawSnake(const std::deque<Point>& snake_body, COLORREF body_colo
 {
     if (snake_body.empty()) return;
 
-    // 1. 画蛇身
+    //画蛇身
     setfillcolor(body_color);
-    setlinecolor(VA_BG_COLOR); // 用背景色做分割线，产生像素块的断裂感
-    for (size_t i = 1; i < snake_body.size(); i++) {
+    setlinecolor(VA_BG_COLOR); 
+    for (size_t i = 1; i < snake_body.size(); i++) 
+    {
         Point p = snake_body[i];
         int sx = GET_X(p.x);
         int sy = GET_Y(p.y);
-        // 稍微缩小一点，留出间隙
+
         fillrectangle(sx + 2, sy + 2, sx + BLOCK_SIZE - 2, sy + BLOCK_SIZE - 2);
     }
 
-    // 2. 画蛇头 (带一点高光)
+    // 画蛇头
     setfillcolor(head_color);
     setlinecolor(WHITE); // 头部高亮边框
     Point head = snake_body.front();
@@ -205,16 +202,16 @@ void UseEasyX::drawSnake(const std::deque<Point>& snake_body, COLORREF body_colo
     int hy = GET_Y(head.y);
     fillrectangle(hx + 1, hy + 1, hx + BLOCK_SIZE - 1, hy + BLOCK_SIZE - 1);
 
-    // 画眼睛 (像素风)
+    // 画眼睛 
     setfillcolor(VA_BG_COLOR);
     solidrectangle(hx + 8, hy + 8, hx + 12, hy + 12);
     solidrectangle(hx + 28, hy + 8, hx + 32, hy + 12);
 }
 
-void UseEasyX::drawUI(int current_score, int high_score, int snake_len, int hp, int game_time_seconds, bool is_paused) {
-
+void UseEasyX::drawUI(int current_score, int high_score, int snake_len, int hp, int game_time_seconds, bool is_paused)
+{
     settextcolor(VA_TEXT_COLOR);
-    settextstyle(28, 0, _T("Consolas")); // 或者 "Courier New"
+    settextstyle(28, 0, _T("Consolas")); 
     setbkmode(TRANSPARENT);
 
     // 1. 绘制基本文字信息
@@ -222,31 +219,33 @@ void UseEasyX::drawUI(int current_score, int high_score, int snake_len, int hp, 
     settextstyle(24, 0, _T("Consolas"));
 
     TCHAR str_buf[128];
-    _stprintf_s(str_buf, _T("[SCORE]: %06d  [HIGH]: %06d"), current_score, high_score); // 补零格式化更有科技感
+    _stprintf_s(str_buf, _T("[SCORE]: %06d  [HIGH]: %06d"), current_score, high_score); 
     outtextxy(20, 20, str_buf);
 
-    _stprintf_s(str_buf, _T("Length: %d  Time: %02d:%02d"), snake_len, game_time_seconds / 60, game_time_seconds % 60);
+    _stprintf_s(str_buf, _T("[Length]: %d  [Time]: %02d:%02d"), snake_len, game_time_seconds / 60, game_time_seconds % 60);
     outtextxy(20, 50, str_buf);
 
-    if (hp > 0) {
+    if (hp > 0)
+    {
         settextcolor(LIGHTRED);
-        _stprintf_s(str_buf, _T("HP: %d"), hp);
+        _stprintf_s(str_buf, _T("[HP]: %d"), hp);
         outtextxy(20, 80, str_buf);
     }
 
-    // 2. 【修改】绘制功能按钮 (根据暂停状态改变文字和颜色)
-    // 如果暂停：显示 "RESUME" (继续)，背景绿色
-    // 如果运行：显示 "PAUSE" (暂停)，背景棕色
+    // 2. 绘制功能按钮 (根据暂停状态改变文字和颜色)
+    // 如果暂停：显示 "RESUME" (继续)
+    // 如果运行：显示 "PAUSE" (暂停)
     drawButton(BTN_PAUSE_X, BTN_PAUSE_Y, BTN_W, BTN_H,
         is_paused ? _T("RESUME") : _T("PAUSE"),
-        is_paused ? VA_NEON_PINK : VA_ACCENT_COLOR); // 使用新变量
+        is_paused ? VA_NEON_PINK : VA_ACCENT_COLOR); 
 
     drawButton(BTN_RETURN_X, BTN_RETURN_Y, BTN_W, BTN_H, _T("MENU"), VA_WALL_BORDER);
 
-    // 3. 【新增】绘制屏幕中央的暂停提示
-    if (is_paused) {
+    // 3. 绘制屏幕中央的暂停提示
+    if (is_paused) 
+    {
         // 设置大号字体
-        settextstyle(80, 0, _T("Impact")); // 更有冲击力的字体
+        settextstyle(80, 0, _T("Impact")); 
         settextcolor(VA_NEON_PINK);
 
         LPCTSTR p_text = _T("GAME PAUSED");
@@ -258,8 +257,8 @@ void UseEasyX::drawUI(int current_score, int high_score, int snake_len, int hp, 
         outtextxy((SCREEN_WIDTH - text_w) / 2, (SCREEN_HEIGHT - text_h) / 2, p_text);
 
         setlinecolor(RGB(0, 0, 0));
-        for (int i = 0; i < SCREEN_HEIGHT; i += 4) {
-            // 这里很难做半透明，可以用深灰色细线代替
+        for (int i = 0; i < SCREEN_HEIGHT; i += 4) 
+        {
             line(0, i, SCREEN_WIDTH, i); 
         }
     }
@@ -277,10 +276,9 @@ void UseEasyX::drawGameOver(int final_score)
 
     // 1. Game Over 标题
     settextcolor(RED);
-    settextstyle(60, 0, _T("Arial")); // 字体稍微改小一点适配 720P
+    settextstyle(60, 0, _T("Arial")); 
     LPCTSTR text = _T("GAME OVER");
     int w = textwidth(text);
-    // Y 轴位置上移，防止挤在一起
     outtextxy(center_x - w / 2, center_y - 80, text);
 
     // 2. 最终得分
@@ -302,8 +300,6 @@ void UseEasyX::drawGameOver(int final_score)
 
 std::string UseEasyX::inputPlayerName()
 {
-    // 这里的 InputBox 是 EasyX 封装的 Windows API
-    // 参数：接收字符串的缓冲区, 缓冲区大小, 提示文本, 标题, 默认值, ...
     TCHAR str_buf[32] = { 0 };
     InputBox(str_buf, 32, _T("Please enter your name:"), _T("New Record"), _T("Player"), 0, 0, false);
 
@@ -343,20 +339,14 @@ void UseEasyX::drawRankings(const std::vector<Record>& records)
 
     // 只显示前 10 名
     int count = 0;
-    for (const auto& rec : records) {
+    for (const auto& rec : records) 
+    {
         if (count >= 10) break;
 
         TCHAR buf[128];
 
-        // 转换 string 到 TCHAR 用于显示
-        // 注意：如果你项目是 Unicode，需要转换 rec.version 和 rec.user_name
-        // 这里假设简单处理，或者直接使用多字节字符集
-
-        // 为了代码通用性，这里用一种简单的格式化方法 (假设项目是多字节字符集)
-        // 如果是 Unicode，请参考上面的 inputPlayerName 里的转换逻辑
         _stprintf_s(buf, _T("%-15S %-15S %d"), rec.version.c_str(), rec.user_name.c_str(), rec.score);
 
-        // 手动对齐显示 (简单版)
         // 版本
         TCHAR ver_buf[32];
         _stprintf_s(ver_buf, _T("%S"), rec.version.c_str());
@@ -365,13 +355,14 @@ void UseEasyX::drawRankings(const std::vector<Record>& records)
         // 名字
         TCHAR name_buf[128];
 
-        // 1. 截断保护：无论名字多长，只取前 20 个字符
+        // 截断保护：无论名字多长，只取前 20 个字符
         std::string safe_name = rec.user_name;
-        if (safe_name.length() > 20) {
+        if (safe_name.length() > 20) 
+        {
             safe_name = safe_name.substr(0, 20) + "..."; // 超长截断并加省略号
         }
 
-        // 2. 使用截断后的 safe_name 进行绘制
+        // 使用截断后的 safe_name 进行绘制
         _stprintf_s(name_buf, _T("%S"), safe_name.c_str());
         outtextxy(500, y, name_buf);
 
@@ -392,15 +383,16 @@ void UseEasyX::drawRankings(const std::vector<Record>& records)
     FlushBatchDraw();
 
     // 等待按键
-    while (true) {
+    while (true) 
+    {
         if (GetAsyncKeyState(VK_SPACE) & 0x8000) break;
         Sleep(10);
     }
 }
 
-
-void UseEasyX::drawButton(int x, int y, int w, int h, LPCTSTR text, COLORREF theme_color) {
-    // 背景半透明黑 (EasyX不支持直接alpha，这里用实心黑覆盖地图)
+void UseEasyX::drawButton(int x, int y, int w, int h, LPCTSTR text, COLORREF theme_color)
+{
+    // 背景半透明黑
     setfillcolor(VA_BG_COLOR);
     solidrectangle(x, y, x + w, y + h);
 
@@ -420,10 +412,11 @@ void UseEasyX::drawButton(int x, int y, int w, int h, LPCTSTR text, COLORREF the
     outtextxy(tx, ty, text);
 }
 
-int UseEasyX::drawMenu() {
+int UseEasyX::drawMenu()
+{
     // --- 菜单布局参数 ---
     int menu_x = 700;
-    int start_y = 150;       // 保持上次调整的高度
+    int start_y = 150;    
     int btn_w = 400;
     int btn_h = 60;
     int gap = 15;
@@ -473,11 +466,13 @@ int UseEasyX::drawMenu() {
         // 绘制滚动的网格 (增加动感)
         setlinecolor(RGB(35, 30, 50));
         // 竖线 (向右微动)
-        for (int i = -40; i < SCREEN_WIDTH; i += 40) {
+        for (int i = -40; i < SCREEN_WIDTH; i += 40) 
+        {
             line(i + grid_offset, 0, i + grid_offset, SCREEN_HEIGHT);
         }
         // 横线 (向下微动)
-        for (int j = -40; j < SCREEN_HEIGHT; j += 40) {
+        for (int j = -40; j < SCREEN_HEIGHT; j += 40)
+        {
             line(0, j + grid_offset, SCREEN_WIDTH, j + grid_offset);
         }
 
@@ -491,7 +486,8 @@ int UseEasyX::drawMenu() {
 
         // 主体层 (正常位置)
         // 如果正在故障，主体层偶尔消失一下 (模拟闪烁)
-        if (!is_glitch || (rand() % 2 == 0)) {
+        if (!is_glitch || (rand() % 2 == 0)) 
+        {
             settextcolor(VA_ACCENT_COLOR);
             outtextxy(100, 150, _T("SNAKE"));
             outtextxy(100, 250, _T("PROTOCOL"));
@@ -516,20 +512,23 @@ int UseEasyX::drawMenu() {
         POINT mouse = getMousePos();
         int hover_index = -1;
 
-        for (int i = 0; i < ITEM_COUNT; i++) {
+        for (int i = 0; i < ITEM_COUNT; i++) 
+        {
             int x = menu_x;
             int y = start_y + i * (btn_h + gap);
             bool is_hover = (mouse.x >= x && mouse.x <= x + btn_w && mouse.y >= y && mouse.y <= y + btn_h);
 
             if (is_hover) hover_index = i;
 
-            if (is_hover) {
+            if (is_hover) 
+            {
                 // 悬停：背景填充，文字变黑
                 setfillcolor(items[i].color);
                 solidrectangle(x, y, x + btn_w, y + btn_h);
                 settextcolor(BLACK);
             }
-            else {
+            else 
+            {
                 // 默认：黑背景，亮边框
                 setfillcolor(VA_BG_COLOR);
                 solidrectangle(x, y, x + btn_w, y + btn_h);
@@ -544,8 +543,10 @@ int UseEasyX::drawMenu() {
             outtextxy(tx, ty, items[i].text);
 
             // 悬停光标闪烁动画
-            if (is_hover) {
-                if ((timer / 10) % 2 == 0) { // 每10帧闪烁一次
+            if (is_hover) 
+            {
+                if ((timer / 10) % 2 == 0) 
+                { // 每10帧闪烁一次
                     outtextxy(x - 30, ty, _T(">"));
                 }
             }
@@ -560,11 +561,13 @@ int UseEasyX::drawMenu() {
 
         settextstyle(24, 0, _T("Consolas"));
 
-        if (hover_index != -1) {
+        if (hover_index != -1) 
+        {
             settextcolor(WHITE);
             outtextxy(20, SCREEN_HEIGHT - 40, items[hover_index].desc);
         }
-        else {
+        else 
+        {
             // 待机文字呼吸效果 (根据 timer 计算灰度)
             int brightness = 100 + abs((int)(sin(timer * 0.05) * 150));
             if (brightness > 255) brightness = 255;
@@ -579,29 +582,30 @@ int UseEasyX::drawMenu() {
         }
 
         // --- 6. 全局特效：CRT 扫描线 ---
-        // 画一条贯穿全屏的半透明亮线 (模拟扫描)
-        // EasyX 没有直接 Alpha，我们用“疏密线”模拟或者直接画一条暗青色线
         setlinecolor(RGB(0, 50, 50));
         line(0, scan_line_y, SCREEN_WIDTH, scan_line_y);
         line(0, scan_line_y + 1, SCREEN_WIDTH, scan_line_y + 1); // 加粗一点
 
         // 静态旧电视扫描纹理 (每隔2行画一条黑线，产生隔行扫描感)
         setlinecolor(0);
-        for (int k = 0; k < SCREEN_HEIGHT; k += 4) {
-            // 慎用：如果在高分辨率下这可能会让屏幕太暗
-            // 这里可以不做处理，或者只在标题区域画
+        for (int k = 0; k < SCREEN_HEIGHT; k += 4) 
+        {
         }
 
         FlushBatchDraw();
 
         // --- 7. 输入处理 ---
-        if (MouseHit()) {
+        if (MouseHit()) 
+        {
             MOUSEMSG msg = GetMouseMsg();
-            if (msg.uMsg == WM_LBUTTONDOWN) {
-                for (int i = 0; i < ITEM_COUNT; i++) {
+            if (msg.uMsg == WM_LBUTTONDOWN) 
+            {
+                for (int i = 0; i < ITEM_COUNT; i++) 
+                {
                     int x = menu_x;
                     int y = start_y + i * (btn_h + gap);
-                    if (isClickIn(msg.x, msg.y, x, y, btn_w, btn_h)) {
+                    if (isClickIn(msg.x, msg.y, x, y, btn_w, btn_h))
+                    {
                         return i + 1;
                     }
                 }
@@ -612,19 +616,21 @@ int UseEasyX::drawMenu() {
     }
 }
 
-bool UseEasyX::isClickIn(int mouse_x, int mouse_y, int x, int y, int w, int h) {
+bool UseEasyX::isClickIn(int mouse_x, int mouse_y, int x, int y, int w, int h) 
+{
     return (mouse_x >= x && mouse_x <= x + w && mouse_y >= y && mouse_y <= y + h);
 }
 
-int UseEasyX::checkGameButtons(int mouse_x, int mouse_y, int offset_y) {
+int UseEasyX::checkGameButtons(int mouse_x, int mouse_y, int offset_y)
+{
     // 将 offset_y 加到 BTN_PAUSE_Y 和 BTN_RETURN_Y
     if (isClickIn(mouse_x, mouse_y, BTN_PAUSE_X, BTN_PAUSE_Y + offset_y, BTN_W, BTN_H)) return 1; // 暂停
     if (isClickIn(mouse_x, mouse_y, BTN_RETURN_X, BTN_RETURN_Y + offset_y, BTN_W, BTN_H)) return 2; // 返回
     return 0;
 }
 
-// 绘制历史记录 (带返回按钮)
-void UseEasyX::drawHistory(RecordManager& mgr) {
+void UseEasyX::drawHistory(RecordManager& mgr)
+{
     // 定义按钮参数
     int btn_w = 120;
     int btn_h = 40;
@@ -643,7 +649,8 @@ void UseEasyX::drawHistory(RecordManager& mgr) {
     bool is_searching = false;
     std::vector<Record> search_result;
 
-    while (true) {
+    while (true)
+    {
         cleardevice();
 
         // 1. 标题
@@ -669,20 +676,22 @@ void UseEasyX::drawHistory(RecordManager& mgr) {
         const std::vector<Record>& list_to_show = is_searching ? search_result : mgr.getAllRecords();
 
         int count = 0;
-        for (size_t i = 0; i < list_to_show.size(); ++i) {
+        for (size_t i = 0; i < list_to_show.size(); ++i) 
+        {
             if (count >= 12) break; // 每页最多显示12条
 
             const auto& rec = list_to_show[i];
 
             TCHAR buf[128];
 
-            // 显示 ID (如果是搜索结果，显示它在原列表的索引可能比较复杂，这里简化显示当前视图的序号)
-            // 为了删除功能的准确性，建议在非搜索模式下才显示真实 ID
-            if (!is_searching) {
+            // 显示 ID 
+            if (!is_searching) 
+            {
                 _stprintf_s(buf, _T("%d"), (int)i);
                 outtextxy(100, y, buf);
             }
-            else {
+            else 
+            {
                 outtextxy(100, y, _T("-"));
             }
 
@@ -705,7 +714,8 @@ void UseEasyX::drawHistory(RecordManager& mgr) {
         }
 
         // 4. 绘制功能按钮
-        if (!is_searching) {
+        if (!is_searching) 
+        {
             drawButton(x_add, btn_y, btn_w, btn_h, _T("ADD"), GREEN);
             drawButton(x_del, btn_y, btn_w, btn_h, _T("DELETE"), RED);
             drawButton(x_mod, btn_y, btn_w, btn_h, _T("MODIFY"), BLUE);
@@ -718,22 +728,28 @@ void UseEasyX::drawHistory(RecordManager& mgr) {
         FlushBatchDraw();
 
         // 5. 交互逻辑
-        if (MouseHit()) {
+        if (MouseHit()) 
+        {
             MOUSEMSG msg = GetMouseMsg();
-            if (msg.uMsg == WM_LBUTTONDOWN) {
+            if (msg.uMsg == WM_LBUTTONDOWN)
+            {
 
                 // --- 返回 / 重置 ---
-                if (isClickIn(msg.x, msg.y, x_back, btn_y, btn_w, btn_h)) {
-                    if (is_searching) {
+                if (isClickIn(msg.x, msg.y, x_back, btn_y, btn_w, btn_h)) 
+                {
+                    if (is_searching) 
+                    {
                         is_searching = false; // 退出搜索模式
                     }
-                    else {
+                    else 
+                    {
                         break; // 退出历史界面
                     }
                 }
 
                 // (仅在非搜索模式下可用)
-                if (!is_searching) {
+                if (!is_searching) 
+                {
 
                     // --- 增 (ADD) ---
                     if (isClickIn(msg.x, msg.y, x_add, btn_y, btn_w, btn_h)) {
@@ -745,7 +761,6 @@ void UseEasyX::drawHistory(RecordManager& mgr) {
 
                         // 转换并添加
 #ifdef UNICODE
-// 简单转换，实际项目建议封装辅助函数
                         int len = WideCharToMultiByte(CP_ACP, 0, name_buf, -1, NULL, 0, NULL, NULL);
                         char* n_ptr = new char[len];
                         WideCharToMultiByte(CP_ACP, 0, name_buf, -1, n_ptr, len, NULL, NULL);
@@ -778,8 +793,6 @@ void UseEasyX::drawHistory(RecordManager& mgr) {
                         // 转换逻辑
                         std::string old_s, new_s;
 #ifdef UNICODE
-                        // 这里省略重复的转换代码，原理同上，将 TCHAR 转为 std::string
-                        // 建议: 在 UseEasyX 类里增加一个 private 的 TcharToString 函数
                         {
                             int l = WideCharToMultiByte(CP_ACP, 0, old_buf, -1, NULL, 0, NULL, NULL);
                             char* p = new char[l];
@@ -834,15 +847,18 @@ void UseEasyX::drawDualGameOver(int winner)
     settextstyle(60, 0, _T("Arial"));
 
     LPCTSTR text = _T("GAME OVER");
-    if (winner == 1) {
+    if (winner == 1) 
+    {
         settextcolor(GREEN);
         text = _T("PLAYER 1 WINS!");
     }
-    else if (winner == 2) {
+    else if (winner == 2) 
+    {
         settextcolor(LIGHTBLUE);
         text = _T("PLAYER 2 WINS!");
     }
-    else {
+    else 
+    {
         settextcolor(YELLOW);
         text = _T("DRAW GAME!");
     }
@@ -860,7 +876,8 @@ void UseEasyX::drawDualGameOver(int winner)
     FlushBatchDraw();
 
     // 等待按空格退出
-    while (true) {
+    while (true) 
+    {
         if (GetAsyncKeyState(VK_SPACE) & 0x8000) break;
         Sleep(10);
     }
@@ -890,14 +907,15 @@ void UseEasyX::drawDualUI(int score1, int score2, int game_time_seconds, bool is
     outtextxy(SCREEN_WIDTH - p2_w - 20, 20, str_buf); // 靠右显示
 
     // 2. 绘制功能按钮 (暂停/菜单) - 复用原来的位置
-    drawButton(BTN_PAUSE_X, BTN_PAUSE_Y + 40, BTN_W, BTN_H, // 稍微下移一点避开分数
+    drawButton(BTN_PAUSE_X, BTN_PAUSE_Y + 40, BTN_W, BTN_H, 
         is_paused ? _T("RESUME") : _T("PAUSE"),
         is_paused ? GREEN : BROWN);
 
     drawButton(BTN_RETURN_X, BTN_RETURN_Y + 40, BTN_W, BTN_H, _T("MENU"), RED);
 
     // 3. 绘制屏幕中央的暂停提示
-    if (is_paused) {
+    if (is_paused)
+    {
         settextstyle(80, 0, _T("Arial"));
         settextcolor(YELLOW);
         LPCTSTR p_text = _T("GAME PAUSED");

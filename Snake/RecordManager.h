@@ -5,7 +5,7 @@
 
 // 定义单条记录结构体
 struct Record {
-    std::string version;   // 游戏版本 (如 "Intro", "Advanced")
+    std::string version;   // 游戏版本 
     std::string user_name; // 用户名
     int score;             // 分数
 
@@ -19,7 +19,7 @@ struct Record {
 class RecordManager {
 private:
     std::string file_path;           // 文件路径
-    std::vector<Record> record_list; // 内存中的记录缓存 (snake_case)
+    std::vector<Record> record_list; // 内存中的记录缓存
 
     // 内部辅助函数：将内存数据写入文件
     void saveToFile();
@@ -28,26 +28,21 @@ public:
     RecordManager();
     ~RecordManager();
 
-    // --- 核心功能 (作业要求) ---
-
-    // 1. 初始化：从文件加载所有记录
+    // 从文件加载所有记录
     void loadRecords();
 
-    // 2. 增：添加一条新记录 (会自动保存)
+    // 增：添加一条新记录
     void addRecord(const std::string& version, const std::string& user_name, int score);
 
-    // 3. 删：根据索引删除一条记录
-    // (实际UI中通常是选定列表中某一行进行删除)
+    //删：根据索引删除一条记录
     void deleteRecord(int index);
 
-    // 4. 改：修改用户名 (作业要求：改查仅限针对用户名)
+    // 改：修改用户名
     // 将所有叫 old_name 的记录改为 new_name
     void modifyUserName(const std::string& old_name, const std::string& new_name);
 
-    // 5. 查：查找特定用户名的所有记录
+    // 查：查找特定用户名的所有记录
     std::vector<Record> searchRecords(const std::string& user_name);
-
-    // --- 辅助功能 (给游戏逻辑用) ---
 
     // 获取某版本的历史最高分
     int getHighestScore(const std::string& version);

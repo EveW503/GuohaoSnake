@@ -2,20 +2,20 @@
 
 Snake::Snake()
 {
-    // 1. 初始方向向右
+    //初始方向向右
     direction = Direction::RIGHT;
 
-    // 2. 动态计算中心位置 (适配 1280x720 或其他分辨率)
+    // 动态计算中心位置
     int center_x = MAP_WIDTH / 2;
     int center_y = MAP_HEIGHT / 2;
 
-    // 3. 初始化 3 节身体
+    //初始化 3 节身体
     snake.push_back({ center_x, center_y });      // 头
     snake.push_back({ center_x - 1, center_y });  // 身
     snake.push_back({ center_x - 2, center_y });  // 尾
 }
 
-Snake::Snake(int x, int y, Direction d)
+Snake::Snake(int x, int y, Direction d)  //为了双人模式修改生成位置
 {
     direction = d;
 
@@ -35,14 +35,13 @@ Snake::Snake(int x, int y, Direction d)
 
 Snake::~Snake() {}
 
-// 【关键修复】获取下个位置（只预测，不移动）
+// 获取下个位置（只预测，不移动）
 Point Snake::getNextPosition()
 {
     // 获取当前蛇头
     Point next_head = snake.front();
 
     // 根据方向计算偏移
-    // 之前可能这里漏了 UP/DOWN 或者写反了
     switch (direction)
     {
     case Direction::UP:
@@ -65,7 +64,6 @@ Point Snake::getNextPosition()
 // 实际移动（头增尾删）
 void Snake::moveToNextPosition()
 {
-    // 复用 getNextPosition 的逻辑，防止两套逻辑不一致
     Point new_head = getNextPosition();
 
     // 加头
@@ -78,27 +76,26 @@ void Snake::moveToNextPosition()
 void Snake::addSnake()
 {
     Point new_head = getNextPosition();
+
     snake.push_front(new_head);
 }
 
 void Snake::shrink()
 {
-    // 只有长度大于 5 才允许缩短，防止减没了
-    if (snake.size() > 5) {
+    if (snake.size() > 5) 
+    {
         // 移除尾部 3 节
-        for (int i = 0; i < 3 && snake.size() > 5; i++) {
+        for (int i = 0; i < 3 && snake.size() > 5; i++) 
+        {
             snake.pop_back();
         }
     }
 }
 
-// 设置方向（含防自杀逻辑的底层支持，虽然 GameBase 也有检查）
 void Snake::setDirection(Direction d)
 {
     direction = d;
 }
-
-// --- 必须补充的接口 (为了支持进阶版和 GameBase) ---
 
 const std::deque<Point>& Snake::getBody() const
 {

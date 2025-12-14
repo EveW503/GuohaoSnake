@@ -2,9 +2,6 @@
 
 GameMap::GameMap()
 {
-    // 【绝对禁止】写硬编码数字 (如 48, 27)
-    // 必须使用 MAP_WIDTH 和 MAP_HEIGHT
-
     // 1. 初始化全图为空气
     for (int i = 0; i < MAP_WIDTH; i++)
     {

@@ -1,5 +1,5 @@
 #include "GameBase.h"
-#include <conio.h>   // 用于 _kbhit
+#include <conio.h>   
 #include <windows.h>
 #include <stdio.h>
 #include <graphics.h>
@@ -22,7 +22,8 @@ GameBase::GameBase(int x, int y, Direction d):snake(x ,y ,d)
     start_time = 0;
 }	
 
-void GameBase::run() {
+void GameBase::run() 
+{
     renderer.initGraph(SCREEN_WIDTH, SCREEN_HEIGHT);
     record_mgr.loadRecords();
     highest_score = record_mgr.getHighestScore(getVersionName());
@@ -40,19 +41,19 @@ void GameBase::run() {
     long long pause_start = 0;
 
     // 主循环
-   // --- 主循环 ---
-    while (!is_game_over) {
+    while (!is_game_over) 
+    {
 
-        // 1. 计算帧等待时间
+        // 1. 计算帧等待时间,分数越高蛇运动得越快
         int frame_wait_time = 150 - (current_score / 5);
         if (frame_wait_time < 50) frame_wait_time = 50;
 
         Direction current_dir = snake.getDirection();
         DWORD start_tick = GetTickCount();
 
-        // --- 【核心修改】渲染循环 (Render Loop) ---
-        // 在等待蛇移动的间隙，高频刷新画面，实现平滑动画
-        while (GetTickCount() - start_tick < (DWORD)frame_wait_time) {
+        //渲染循环
+        while (GetTickCount() - start_tick < (DWORD)frame_wait_time)
+        {
 
             // A. 处理输入 (保持原有逻辑)
             if ((GetAsyncKeyState('W') & 0x8000) && current_dir != Direction::DOWN) snake.setDirection(Direction::UP);
@@ -62,9 +63,11 @@ void GameBase::run() {
 
             // B. 处理鼠标 (暂停/退出)
             bool should_break_wait = false;
-            while (MouseHit()) {
+            while (MouseHit()) 
+            {
                 MOUSEMSG msg = GetMouseMsg();
-                if (msg.uMsg == WM_LBUTTONDOWN) {
+                if (msg.uMsg == WM_LBUTTONDOWN) 
+                {
                     int btn = renderer.checkGameButtons(msg.x, msg.y);
                     if (btn == 1) { // 暂停
                         is_paused = !is_paused; // 切换状态
@@ -77,12 +80,12 @@ void GameBase::run() {
             }
             if (should_break_wait) break; // 如果点击了暂停，立即跳出等待
 
-            // C. 【暂停逻辑】
-            if (is_paused) {
+            // C. 暂停逻辑
+            if (is_paused)
+            {
                 // 暂停时也需要渲染，否则画面会卡死
                 int display_time = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
                 renderer.drawMap(map);
-                // 赛博风格配色：青色身体，亮青色头
                 renderer.drawSnake(snake.getBody(), RGB(0, 120, 140), RGB(0, 255, 255));
                 renderer.drawUI(current_score, highest_score, snake.getLength(), hp, display_time, true);
                 Sleep(100); // 暂停时不需要太高帧率
@@ -92,22 +95,22 @@ void GameBase::run() {
                 continue;
             }
 
-            // D. 【高频渲染】在这里画图！
+            // D. 高频渲染
             int display_time = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
 
-            renderer.drawMap(map); // 这会让食物呼吸和数据块闪烁变得非常丝滑
+            renderer.drawMap(map); 
             renderer.drawSnake(snake.getBody(), RGB(0, 120, 140), RGB(0, 255, 255));
             renderer.drawUI(current_score, highest_score, snake.getLength(), hp, display_time, false);
 
             Sleep(16); // 锁定约 60 FPS
         }
 
-        // --- 逻辑更新 (只有时间到了才执行) ---
-        if (!is_paused) {
+        //逻辑更新
+        if (!is_paused) 
+        {
             update();
         }
     }
-
 
     // 游戏结束结算
     renderer.drawGameOver(current_score);
@@ -115,7 +118,7 @@ void GameBase::run() {
     Sleep(500);
 
     std::string player_name = renderer.inputPlayerName();
-    if (player_name.empty()) player_name = "Anonymous";
+    if (player_name.empty()) player_name = "Anonymous";  //默认名Anonymous
     record_mgr.addRecord(getVersionName(), player_name, current_score);
 
     renderer.drawRankings(record_mgr.getAllRecords());
@@ -124,54 +127,44 @@ void GameBase::run() {
 
 void GameBase::update() 
 {
-    // 1. 预判下一步位置
+    // 预判下一步位置
     Point next_pos = snake.getNextPosition();
 
-    // 2. 碰撞检测：直接查地图
+    // 查地图碰撞检测
     BlockType type = map.getBlock(next_pos.x, next_pos.y);
 
-    // 3. 分支逻辑
     if (type == BlockType::WALL || type == BlockType::SNAKE_BODY || type == BlockType::SNAKE_HEAD)
     {
-        // 撞墙或撞自身 -> 触发死亡逻辑 (多态)
         onSnakeDie();
     }
     else if (type == BlockType::FOOD || type == BlockType::DATA_FRAG)
     {
-        // --- 吃食物逻辑 ---
-
-        // 1. 如果是数据碎片，先缩短
-        if (type == BlockType::DATA_FRAG) {
-            // 先把当前的蛇尾巴在地图上清除掉 (否则缩短后地图上会残留尾巴的影子)
-            // 简单暴力的做法：遍历当前蛇身设为 AIR，缩短后再画回去
-            // 或者只清除尾部这几节。
-            // 为了代码简单，我们利用 UseEasyX 每次重绘全图的特性，
-            // 这里主要负责更新逻辑数据，地图数据 sync 稍微麻烦点。
-
-            // 正确做法：手动清除地图上的旧尾巴
+        if (type == BlockType::DATA_FRAG)
+        {
             const std::deque<Point>& old_body = snake.getBody();
             // 倒序清除最后 3 个
             int cut_count = 0;
-            for (auto it = old_body.rbegin(); it != old_body.rend(); ++it) {
+            for (auto it = old_body.rbegin(); it != old_body.rend(); ++it)
+            {
                 if (cut_count >= 3) break;
                 map.setBlock(BlockType::AIR, it->x, it->y);
                 cut_count++;
             }
 
             snake.shrink(); // 物理变短
-            current_score += 50; // 特殊道具加分更多！
+            current_score += 50; // 特殊道具加50分
         }
-        else {
+        else 
+        {
             current_score += 10;
         }
 
-        // 2. 蛇变长 (只增不删) -> 注意：shrink 后这里又 addSnake，相当于净减 2 节
         snake.addSnake();
 
-        // 3. 维护地图数据
+        //维护地图数据
         map.setBlock(BlockType::SNAKE_HEAD, next_pos.x, next_pos.y);
 
-        // 4. 维护食物状态
+        //维护食物状态
         food.eatFood(next_pos);
         if (current_score > highest_score) highest_score = current_score;
 
@@ -183,23 +176,18 @@ void GameBase::update()
     }
     else 
     {
-        // --- 普通移动逻辑 (AIR) ---
-
-        // 1. 获取移动前的尾巴位置 (为了清除地图上的痕迹)
-        // 注意：需要 Snake 类提供 getBody()
+        // 获取移动前的尾巴位置
         Point old_tail = snake.getBody().back();
 
-        // 2. 蛇内部移动 (头增尾删)
+        // 蛇内部移动 (头增尾删)
         snake.moveToNextPosition();
 
-        // 3. 同步地图: 
+        // 同步地图
         // 旧尾巴变成空气
         map.setBlock(BlockType::AIR, old_tail.x, old_tail.y);
         // 新头变成蛇头
         Point new_head = snake.getBody().front();
         map.setBlock(BlockType::SNAKE_HEAD, new_head.x, new_head.y);
-
-        // (可选) 稍微修正一下旧头变成身体，虽然渲染器通常能处理
         if (snake.getBody().size() > 1) 
         {
             Point old_head = snake.getBody()[1];
@@ -209,33 +197,23 @@ void GameBase::update()
 }
 
 
-// --- IntroGame (入门版) 实现 ---
-
+//IntroGame实现
 void IntroGame::onSnakeDie() 
 {
-    // 入门版规则：撞到即死
     is_game_over = true;
 }
 
-// --- AdvancedGame (进阶版) 实现 ---
-
+//AdvancedGame实现
 void AdvancedGame::onSnakeDie()
 {
     // 进阶版规则：撞到后，尸身变墙，重生
-
-    // 1. 尸身变墙
+    // 尸身变墙
     const std::deque<Point>& body = snake.getBody();
     for (const auto& p : body)
     {
         map.setBlock(BlockType::WALL, p.x, p.y);
     }
-
-    // 2. 扣血 (如果有生命值设计)
-    // hp--; 
-
-    // 3. 尝试重生 (需要 Snake 提供 reset 接口)
-    // 简单逻辑：在地图中心重生
-    // 如果中心不是 AIR，则无法重生，游戏结束
+    // 3. 尝试重生
     static std::mt19937 rng(static_cast<unsigned int>(std::time(nullptr)));
     std::uniform_int_distribution<int> distX(3, MAP_WIDTH - 2);
     std::uniform_int_distribution<int> distY(3, MAP_HEIGHT - 2);
@@ -288,15 +266,16 @@ void AdvancedGame::onSnakeDie()
 
 }
 
-// --- ExpertGame (高级版) ---
-ExpertGame::ExpertGame() {
+//ExpertGame(高级版）
+ExpertGame::ExpertGame() 
+{
     death_count = 0;
-    hp = 5; // 初始显示5条命
+    hp = 5; // 初始5条命
 }
 
 void ExpertGame::onSnakeDie()
 {
-    // 1. 尸身变食物
+    // 尸身变食物
     const std::deque<Point>& body = snake.getBody();
     for (const auto& p : body)
     {
@@ -317,7 +296,7 @@ void ExpertGame::onSnakeDie()
     }
 
 
-    // 2. 尝试重生
+    // 尝试重生
     static std::mt19937 rng(static_cast<unsigned int>(std::time(nullptr)));
     std::uniform_int_distribution<int> distX(3, MAP_WIDTH - 2);
     std::uniform_int_distribution<int> distY(3, MAP_HEIGHT - 2);
@@ -369,13 +348,13 @@ void ExpertGame::onSnakeDie()
 
 }
 
-// --- DualGame (本地双人对战版) 实现 ---
+//DualGame (本地双人对战版)
 DualGame::DualGame(int x_1, int y_1, Direction d_1, int x_2, int y_2, Direction d_2):
     GameBase(x_1,y_1,d_1),snake_2(x_2, y_2, d_2)
 {
-    score_2 = 0; // 【新增】记录 P2 的分数
+    score_2 = 0; // 记录 P2 的分数
     winner = 0; // 初始化为平局
-    hp = 0;     // 双人模式不需要 HP
+    hp = 0;     
 }
 
 void DualGame::run()
@@ -397,8 +376,8 @@ void DualGame::run()
     long long pause_duration = 0;
     long long pause_start = 0;
 
-    while (!is_game_over) {
-        // 计算速度
+    while (!is_game_over) 
+    {
         int frame_wait_time = 150 - (current_score / 5);
         if (frame_wait_time < 50) frame_wait_time = 50;
 
@@ -406,8 +385,8 @@ void DualGame::run()
         Direction current_dir_2 = snake_2.getDirection();
         DWORD start_tick = GetTickCount();
 
-        // --- 渲染循环 ---
-        while (GetTickCount() - start_tick < (DWORD)frame_wait_time) {
+        while (GetTickCount() - start_tick < (DWORD)frame_wait_time)
+        {
 
             // 1. P1 控制
             if ((GetAsyncKeyState('W') & 0x8000) && current_dir_1 != Direction::DOWN) snake.setDirection(Direction::UP);
@@ -423,11 +402,14 @@ void DualGame::run()
 
             // 3. 鼠标检测
             bool should_break_wait = false;
-            while (MouseHit()) {
+            while (MouseHit())
+            {
                 MOUSEMSG msg = GetMouseMsg();
-                if (msg.uMsg == WM_LBUTTONDOWN) {
+                if (msg.uMsg == WM_LBUTTONDOWN)
+                {
                     int btn = renderer.checkGameButtons(msg.x, msg.y, 40);
-                    if (btn == 1) {
+                    if (btn == 1) 
+                    {
                         is_paused = !is_paused;
                         if (is_paused) pause_start = std::time(nullptr);
                         else pause_duration += (std::time(nullptr) - pause_start);
@@ -439,31 +421,32 @@ void DualGame::run()
             if (should_break_wait) break;
 
             // 4. 暂停渲染
-            if (is_paused) {
+            if (is_paused) 
+            {
                 int display_time = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
                 renderer.drawMap(map);
-                renderer.drawSnake(snake.getBody(), RGB(0, 120, 140), RGB(0, 255, 255)); // P1 青色
-                renderer.drawSnake(snake_2.getBody(), RGB(160, 0, 60), RGB(255, 42, 109)); // P2 粉色
+                renderer.drawSnake(snake.getBody(), RGB(0, 120, 140), RGB(0, 255, 255)); 
+                renderer.drawSnake(snake_2.getBody(), RGB(160, 0, 60), RGB(255, 42, 109)); 
                 renderer.drawDualUI(current_score, score_2, display_time, true);
                 Sleep(100);
                 start_tick = GetTickCount();
                 continue;
             }
 
-            // 5. 【高频渲染】
+            // 5. 高频渲染
             int display_time = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
             renderer.drawMap(map);
 
-            // 绘制两条蛇 (使用 VA-11 配色)
             renderer.drawSnake(snake.getBody(), RGB(0, 120, 140), RGB(0, 255, 255));
             renderer.drawSnake(snake_2.getBody(), RGB(160, 0, 60), RGB(255, 42, 109));
 
             renderer.drawDualUI(current_score, score_2, display_time, false);
 
-            Sleep(16); // 60 FPS
+            Sleep(16); 
         }
 
-        if (!is_paused) {
+        if (!is_paused)
+        {
             update();
             if (is_game_over) break;
         }
@@ -486,18 +469,15 @@ void DualGame::update()
     if (p1_out) { winner = 2; is_game_over = true; return; }
     if (p2_out) { winner = 1; is_game_over = true; return; }
 
-    // 2. 【平局判定 1】头对头相撞
-    if (p1_next == p2_next) {
+    // 2. 平局判定，头对头相撞
+    if (p1_next == p2_next)
+    {
         winner = 0;
         is_game_over = true;
         return;
     }
 
     // 3. 准备碰撞检测
-    // 为了允许“追尾”（比如 P1 的头走到 P2 刚离开的尾巴位置），
-    // 我们需要先检查是否吃食。如果不吃食，尾巴稍后会移走，所以尾巴是安全的。
-    // 但为了逻辑简化和稳定性，这里我们先判断该位置当前的状态。
-
     BlockType t1 = map.getBlock(p1_next.x, p1_next.y);
     BlockType t2 = map.getBlock(p2_next.x, p2_next.y);
 
@@ -505,15 +485,13 @@ void DualGame::update()
     bool p2_die = false;
 
     // 4. P1 死亡判定 (撞墙、撞身体、撞另一条蛇)
-    // 注意：如果是 FOOD，不算死
-    if (t1 == BlockType::WALL || t1 == BlockType::SNAKE_BODY || t1 == BlockType::SNAKE_HEAD) {
-        // 特殊处理：如果是撞到自己的尾巴且没吃食，或者撞到对方的尾巴且对方没吃食，其实是安全的
-        // 但为了代码简洁，这里采用严格判定：撞到任何非空气非食物即死
+    if (t1 == BlockType::WALL || t1 == BlockType::SNAKE_BODY || t1 == BlockType::SNAKE_HEAD)
+    {
         p1_die = true;
     }
-
     // 5. P2 死亡判定
-    if (t2 == BlockType::WALL || t2 == BlockType::SNAKE_BODY || t2 == BlockType::SNAKE_HEAD) {
+    if (t2 == BlockType::WALL || t2 == BlockType::SNAKE_BODY || t2 == BlockType::SNAKE_HEAD) 
+    {
         p2_die = true;
     }
 
@@ -523,12 +501,14 @@ void DualGame::update()
     if (p2_die) { winner = 1; is_game_over = true; return; } // P2死，P1赢
 
     // 7. 处理 P1 移动/吃食
-    if (t1 == BlockType::FOOD) {
+    if (t1 == BlockType::FOOD) 
+    {
         snake.addSnake(); // 变长
         food.eatFood(p1_next); // 清除食物
         current_score += 10;   // 借用 current_score 存 P1 分数
     }
-    else {
+    else 
+    {
         Point tail = snake.getBody().back();
         map.setBlock(BlockType::AIR, tail.x, tail.y); // 清除尾巴
         snake.moveToNextPosition();
@@ -536,24 +516,28 @@ void DualGame::update()
     // 更新 P1 新头位置
     map.setBlock(BlockType::SNAKE_HEAD, p1_next.x, p1_next.y);
     // 将 P1 旧头标记为身体
-    if (snake.getLength() > 1) {
+    if (snake.getLength() > 1) 
+    {
         Point old_head = snake.getBody()[1];
         map.setBlock(BlockType::SNAKE_BODY, old_head.x, old_head.y);
     }
 
     // 8. 处理 P2 移动/吃食
-    if (t2 == BlockType::FOOD) {
+    if (t2 == BlockType::FOOD)
+    {
         snake_2.addSnake();
         food.eatFood(p2_next);
-        score_2 += 10; // 【新增】P2 得分 +10
+        score_2 += 10; // P2 得分 +10
     }
-    else {
+    else 
+    {
         Point tail = snake_2.getBody().back();
         map.setBlock(BlockType::AIR, tail.x, tail.y);
         snake_2.moveToNextPosition();
     }
     map.setBlock(BlockType::SNAKE_HEAD, p2_next.x, p2_next.y);
-    if (snake_2.getLength() > 1) {
+    if (snake_2.getLength() > 1)
+    {
         Point old_head = snake_2.getBody()[1];
         map.setBlock(BlockType::SNAKE_BODY, old_head.x, old_head.y);
     }
@@ -567,7 +551,5 @@ void DualGame::update()
 
 void DualGame::onSnakeDie()
 {
-    // 这个函数可能不会被调用，因为我们在 update 里直接处理了死亡
-    // 但为了接口完整性：
     is_game_over = true;
 }

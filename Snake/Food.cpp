@@ -4,7 +4,6 @@
 
 Food::Food()
 {
-    // vector 自动初始化，无需手动初始化数组
     food_list.clear();
 }
 
@@ -17,7 +16,7 @@ void Food::eatFood(Point p)
     {
         if (it->x == p.x && it->y == p.y)
         {
-            food_list.erase(it); // 安全删除
+            food_list.erase(it); 
             return;
         }
     }
@@ -36,7 +35,8 @@ void Food::generateFood(GameMap& map)
     // 1. 清理地图上旧的食物
     for (const auto& p : food_list)
     {
-        if (map.getBlock(p.x, p.y) == BlockType::FOOD) {
+        if (map.getBlock(p.x, p.y) == BlockType::FOOD)
+        {
             map.setBlock(BlockType::AIR, p.x, p.y);
         }
     }
@@ -68,7 +68,7 @@ void Food::generateFood(GameMap& map)
             tryCount++;
         }
 
-        // 兜底策略：如果随机不到，就遍历地图找空位
+        // 如果随机不到，就遍历地图找空位
         if (!success)
         {
             for (int i = 1; i < MAP_WIDTH - 1 && !success; i++)

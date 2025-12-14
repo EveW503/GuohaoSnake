@@ -6,19 +6,17 @@
 #include "UseEasyX.h"
 #include "RecordManager.h"
 #include "Food.h"
-#include <ctime> // 用于计时
+#include <ctime> 
 
 // 抽象基类
 class GameBase {
 protected:
     RecordManager record_mgr;   // 存档管理器
-    // 核心对象
-    Snake snake;
-    GameMap map;
 
-    // 工具对象
+    Snake snake;  //蛇
+    GameMap map;  //地图
+
     UseEasyX renderer;          // 渲染器
-
 
     Food food;
 
@@ -37,7 +35,7 @@ public:
     virtual void run(); // 主循环
 
 protected:
-    // 核心虚函数 (smallCamel)
+    // 核心虚函数
     virtual void onSnakeDie() = 0;
 
     // 逻辑更新
@@ -51,7 +49,7 @@ protected:
 class IntroGame : public GameBase {
 protected:
     void onSnakeDie() override;
-    std::string getVersionName() const override { return "Intro"; }
+    std::string getVersionName() const override { return "Intro"; }  //用于记录版本
 };
 
 // 进阶版
@@ -61,24 +59,31 @@ protected:
     std::string getVersionName() const override { return "Advanced"; }
 };
 
+//专家版
 class ExpertGame : public GameBase {
 private:
     int death_count; // 记录撞墙次数
+
 public:
-    ExpertGame(); // 构造函数初始化计数器
+    ExpertGame(); 
+
 protected:
     void onSnakeDie() override;
     std::string getVersionName() const override { return "Expert"; }
+
 };
 
+//本地双人游戏
 class DualGame : public GameBase {
 private:
     Snake snake_2;
-    int score_2; // 【新增】记录 P2 的分数
-    int winner; // 【新增】记录胜者: 0=平局, 1=P1赢, 2=P2赢
+    int score_2; // 记录 P2 的分数
+    int winner; // 0=平局, 1=P1赢, 2=P2赢
+
 public:
     DualGame(int x_1, int y_1, Direction d_1, int x_2, int y_2, Direction d_2);
     void run() override;
+
 protected:
     void onSnakeDie() override;
     void update() override;

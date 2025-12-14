@@ -15,7 +15,7 @@ public:
     // 核心移动
     void moveToNextPosition();
     Point getNextPosition();
-    void addSnake();
+    void addSnake();  //增长身体
     void shrink(); // 缩短身体
 
     // 设置/获取方向
