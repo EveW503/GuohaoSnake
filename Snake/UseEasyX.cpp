@@ -342,9 +342,10 @@ bool UseEasyX::isClickIn(int mouse_x, int mouse_y, int x, int y, int w, int h) {
     return (mouse_x >= x && mouse_x <= x + w && mouse_y >= y && mouse_y <= y + h);
 }
 
-int UseEasyX::checkGameButtons(int mouse_x, int mouse_y) {
-    if (isClickIn(mouse_x, mouse_y, BTN_PAUSE_X, BTN_PAUSE_Y, BTN_W, BTN_H)) return 1; // 暂停
-    if (isClickIn(mouse_x, mouse_y, BTN_RETURN_X, BTN_RETURN_Y, BTN_W, BTN_H)) return 2; // 返回
+int UseEasyX::checkGameButtons(int mouse_x, int mouse_y, int offset_y) {
+    // 将 offset_y 加到 BTN_PAUSE_Y 和 BTN_RETURN_Y
+    if (isClickIn(mouse_x, mouse_y, BTN_PAUSE_X, BTN_PAUSE_Y + offset_y, BTN_W, BTN_H)) return 1; // 暂停
+    if (isClickIn(mouse_x, mouse_y, BTN_RETURN_X, BTN_RETURN_Y + offset_y, BTN_W, BTN_H)) return 2; // 返回
     return 0;
 }
 

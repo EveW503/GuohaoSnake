@@ -36,7 +36,7 @@ public:
     void drawHistory(RecordManager& mgr);
 
     // 【新增】检查游戏内按钮点击 (返回 0:无, 1:暂停, 2:返回菜单)
-    int checkGameButtons(int mouse_x, int mouse_y);
+    int checkGameButtons(int mouse_x, int mouse_y, int offset_y = 0);
 
     void drawDualGameOver(int winner);
 

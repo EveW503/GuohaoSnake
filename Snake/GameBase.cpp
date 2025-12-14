@@ -13,7 +13,8 @@ GameBase::GameBase()
 	start_time = 0;
 }
 
-GameBase::GameBase(int x, int y, Direction d):snake(x ,y ,d) {
+GameBase::GameBase(int x, int y, Direction d):snake(x ,y ,d)
+{
     is_game_over = false;
     current_score = 0;
     highest_score = 0;
@@ -408,7 +409,7 @@ void DualGame::run()
         while (MouseHit()) {
             MOUSEMSG msg = GetMouseMsg();
             if (msg.uMsg == WM_LBUTTONDOWN) {
-                int action = renderer.checkGameButtons(msg.x, msg.y);
+                int action = renderer.checkGameButtons(msg.x, msg.y, 40);
 
                 if (action == 1) { // ÔÝÍ£/¼ÌÐø
                     is_paused = !is_paused;
@@ -471,7 +472,7 @@ void DualGame::run()
             while (MouseHit()) {
                 MOUSEMSG msg = GetMouseMsg();
                 if (msg.uMsg == WM_LBUTTONDOWN) {
-                    int btn = renderer.checkGameButtons(msg.x, msg.y);
+                    int btn = renderer.checkGameButtons(msg.x, msg.y, 40);
                     if (btn == 1) { // ÔÝÍ£
                         is_paused = true;
                         pause_start = std::time(nullptr);
