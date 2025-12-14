@@ -1,5 +1,10 @@
-Intro  12W 360
+Intro 12W 360
 Intro Player 250
 Intro 21312 50
+Intro ds 40
 Intro awda 20
+Intro asfsa 20
 Intro t 10
+Intro awda 10
+Intro ´ó 10
+Intro 2 10
