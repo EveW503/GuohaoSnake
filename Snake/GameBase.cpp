@@ -40,98 +40,74 @@ void GameBase::run() {
     long long pause_start = 0;
 
     // 主循环
+   // --- 主循环 ---
     while (!is_game_over) {
 
-        // --- 1. 处理鼠标点击 (按钮) ---
-        // 使用 while 循环清空消息队列，解决点击不灵敏问题
-        while (MouseHit()) {
-            MOUSEMSG msg = GetMouseMsg();
-            if (msg.uMsg == WM_LBUTTONDOWN) {
-                int action = renderer.checkGameButtons(msg.x, msg.y);
-
-                if (action == 1) { // 暂停/继续
-                    is_paused = !is_paused;
-                    if (is_paused) {
-                        pause_start = std::time(nullptr);
-                    }
-                    else {
-                        pause_duration += (std::time(nullptr) - pause_start);
-                    }
-                    // 立即重绘一次UI
-                    int dt = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
-                    renderer.drawUI(current_score, highest_score, snake.getLength(), hp, dt, is_paused);
-                }
-                else if (action == 2) { // 立即退出
-                    renderer.close();
-                    return; // 直接结束 run 函数
-                }
-            }
-        }
-
-        // --- 2. 暂停状态 ---
-        if (is_paused) {
-            Sleep(100);
-            continue;
-        }
-
-        // --- 3. 正常游戏逻辑 ---
+        // 1. 计算帧等待时间
         int frame_wait_time = 150 - (current_score / 5);
         if (frame_wait_time < 50) frame_wait_time = 50;
 
         Direction current_dir = snake.getDirection();
         DWORD start_tick = GetTickCount();
 
-        // 等待期间检测输入 (非阻塞延时)
+        // --- 【核心修改】渲染循环 (Render Loop) ---
+        // 在等待蛇移动的间隙，高频刷新画面，实现平滑动画
         while (GetTickCount() - start_tick < (DWORD)frame_wait_time) {
-            // 键盘控制
+
+            // A. 处理输入 (保持原有逻辑)
             if ((GetAsyncKeyState('W') & 0x8000) && current_dir != Direction::DOWN) snake.setDirection(Direction::UP);
             else if ((GetAsyncKeyState('S') & 0x8000) && current_dir != Direction::UP) snake.setDirection(Direction::DOWN);
             else if ((GetAsyncKeyState('A') & 0x8000) && current_dir != Direction::RIGHT) snake.setDirection(Direction::LEFT);
             else if ((GetAsyncKeyState('D') & 0x8000) && current_dir != Direction::LEFT) snake.setDirection(Direction::RIGHT);
 
-            // 【关键修复】等待期间也要检测鼠标
-            bool should_break_wait = false; // 标记是否需要跳出等待循环
-
+            // B. 处理鼠标 (暂停/退出)
+            bool should_break_wait = false;
             while (MouseHit()) {
                 MOUSEMSG msg = GetMouseMsg();
                 if (msg.uMsg == WM_LBUTTONDOWN) {
                     int btn = renderer.checkGameButtons(msg.x, msg.y);
                     if (btn == 1) { // 暂停
-                        is_paused = true;
-                        pause_start = std::time(nullptr);
-
-                        int dt = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
-                        renderer.drawUI(current_score, highest_score, snake.getLength(), hp, dt, is_paused);
-
-                        should_break_wait = true; // 标记需要跳出外层
-                        break; // 跳出 MouseHit 循环
+                        is_paused = !is_paused; // 切换状态
+                        if (is_paused) pause_start = std::time(nullptr);
+                        else pause_duration += (std::time(nullptr) - pause_start);
+                        should_break_wait = true; // 跳出等待去处理暂停
                     }
-                    if (btn == 2) { // 退出
-                        renderer.close();
-                        return; // 直接返回
-                    }
+                    if (btn == 2) { renderer.close(); return; }
                 }
             }
+            if (should_break_wait) break; // 如果点击了暂停，立即跳出等待
 
-            // 如果点击了暂停，跳出等待循环，让主循环处理暂停逻辑
-            if (should_break_wait) {
-                break;
+            // C. 【暂停逻辑】
+            if (is_paused) {
+                // 暂停时也需要渲染，否则画面会卡死
+                int display_time = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
+                renderer.drawMap(map);
+                // 赛博风格配色：青色身体，亮青色头
+                renderer.drawSnake(snake.getBody(), RGB(0, 120, 140), RGB(0, 255, 255));
+                renderer.drawUI(current_score, highest_score, snake.getLength(), hp, display_time, true);
+                Sleep(100); // 暂停时不需要太高帧率
+
+                // 重置 start_tick 以免暂停结束后蛇瞬间移动
+                start_tick = GetTickCount();
+                continue;
             }
 
-            Sleep(10);
+            // D. 【高频渲染】在这里画图！
+            int display_time = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
+
+            renderer.drawMap(map); // 这会让食物呼吸和数据块闪烁变得非常丝滑
+            renderer.drawSnake(snake.getBody(), RGB(0, 120, 140), RGB(0, 255, 255));
+            renderer.drawUI(current_score, highest_score, snake.getLength(), hp, display_time, false);
+
+            Sleep(16); // 锁定约 60 FPS
         }
 
-        // 如果触发了暂停，直接跳过本次 update/render，进入下一次主循环
-        if (is_paused) continue;
-
-        update();
-
-        // 渲染
-        int display_time = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
-        renderer.drawMap(map);
-        renderer.drawSnake(snake.getBody(), RGB(0, 120, 140), RGB(0, 255, 255));
-        renderer.drawUI(current_score, highest_score, snake.getLength(), hp, display_time, false);
+        // --- 逻辑更新 (只有时间到了才执行) ---
+        if (!is_paused) {
+            update();
+        }
     }
+
 
     // 游戏结束结算
     renderer.drawGameOver(current_score);
@@ -405,11 +381,10 @@ DualGame::DualGame(int x_1, int y_1, Direction d_1, int x_2, int y_2, Direction 
 void DualGame::run()
 {
     renderer.initGraph(SCREEN_WIDTH, SCREEN_HEIGHT);
-
     start_time = std::time(nullptr);
     food.generateFood(map);
 
-    // 初始化蛇位置
+    // 初始化蛇位置 (保持原样)
     const std::deque<Point>& initial_body_1 = snake.getBody();
     for (const auto& p : initial_body_1) map.setBlock(BlockType::SNAKE_BODY, p.x, p.y);
     if (!initial_body_1.empty()) map.setBlock(BlockType::SNAKE_HEAD, initial_body_1.front().x, initial_body_1.front().y);
@@ -422,119 +397,78 @@ void DualGame::run()
     long long pause_duration = 0;
     long long pause_start = 0;
 
-    // 主循环
     while (!is_game_over) {
-
-        // --- 1. 处理鼠标点击 (按钮) ---
-        // 使用 while 循环清空消息队列，解决点击不灵敏问题
-        while (MouseHit()) {
-            MOUSEMSG msg = GetMouseMsg();
-            if (msg.uMsg == WM_LBUTTONDOWN) {
-                int action = renderer.checkGameButtons(msg.x, msg.y, 40);
-
-                if (action == 1) { // 暂停/继续
-                    is_paused = !is_paused;
-                    if (is_paused) {
-                        pause_start = std::time(nullptr);
-                    }
-                    else {
-                        pause_duration += (std::time(nullptr) - pause_start);
-                    }
-                    // 立即重绘一次UI
-                    int dt = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
-                    renderer.drawDualUI(current_score, score_2, dt, is_paused);
-                }
-                else if (action == 2) { // 立即退出
-                    renderer.close();
-                    return; // 直接结束 run 函数
-                }
-            }
-        }
-
-        // --- 2. 暂停状态 ---
-        if (is_paused) {
-            Sleep(100);
-            continue;
-        }
-
-        // --- 3. 正常游戏逻辑 ---
+        // 计算速度
         int frame_wait_time = 150 - (current_score / 5);
         if (frame_wait_time < 50) frame_wait_time = 50;
 
-        Direction current_dir_1 = snake.getDirection();   // 蛇一方向
-        Direction current_dir_2 = snake_2.getDirection(); // 【新增】蛇二方向
-
+        Direction current_dir_1 = snake.getDirection();
+        Direction current_dir_2 = snake_2.getDirection();
         DWORD start_tick = GetTickCount();
 
+        // --- 渲染循环 ---
         while (GetTickCount() - start_tick < (DWORD)frame_wait_time) {
-            // 1. 蛇一控制 (使用 current_dir_1)
-            if ((GetAsyncKeyState('W') & 0x8000) && current_dir_1 != Direction::DOWN)
-                snake.setDirection(Direction::UP);
-            else if ((GetAsyncKeyState('S') & 0x8000) && current_dir_1 != Direction::UP)
-                snake.setDirection(Direction::DOWN);
-            else if ((GetAsyncKeyState('A') & 0x8000) && current_dir_1 != Direction::RIGHT)
-                snake.setDirection(Direction::LEFT);
-            else if ((GetAsyncKeyState('D') & 0x8000) && current_dir_1 != Direction::LEFT)
-                snake.setDirection(Direction::RIGHT);
 
-            // 2. 蛇二控制 (使用 current_dir_2) 【修复点】
-            if ((GetAsyncKeyState(VK_UP) & 0x8000) && current_dir_2 != Direction::DOWN)
-                snake_2.setDirection(Direction::UP);
-            else if ((GetAsyncKeyState(VK_DOWN) & 0x8000) && current_dir_2 != Direction::UP)
-                snake_2.setDirection(Direction::DOWN);
-            else if ((GetAsyncKeyState(VK_LEFT) & 0x8000) && current_dir_2 != Direction::RIGHT) // 现在逻辑正确了
-                snake_2.setDirection(Direction::LEFT);
-            else if ((GetAsyncKeyState(VK_RIGHT) & 0x8000) && current_dir_2 != Direction::LEFT)
-                snake_2.setDirection(Direction::RIGHT);
+            // 1. P1 控制
+            if ((GetAsyncKeyState('W') & 0x8000) && current_dir_1 != Direction::DOWN) snake.setDirection(Direction::UP);
+            else if ((GetAsyncKeyState('S') & 0x8000) && current_dir_1 != Direction::UP) snake.setDirection(Direction::DOWN);
+            else if ((GetAsyncKeyState('A') & 0x8000) && current_dir_1 != Direction::RIGHT) snake.setDirection(Direction::LEFT);
+            else if ((GetAsyncKeyState('D') & 0x8000) && current_dir_1 != Direction::LEFT) snake.setDirection(Direction::RIGHT);
 
-            // 【关键修复】等待期间也要检测鼠标
-            bool should_break_wait = false; // 标记是否需要跳出等待循环
+            // 2. P2 控制
+            if ((GetAsyncKeyState(VK_UP) & 0x8000) && current_dir_2 != Direction::DOWN) snake_2.setDirection(Direction::UP);
+            else if ((GetAsyncKeyState(VK_DOWN) & 0x8000) && current_dir_2 != Direction::UP) snake_2.setDirection(Direction::DOWN);
+            else if ((GetAsyncKeyState(VK_LEFT) & 0x8000) && current_dir_2 != Direction::RIGHT) snake_2.setDirection(Direction::LEFT);
+            else if ((GetAsyncKeyState(VK_RIGHT) & 0x8000) && current_dir_2 != Direction::LEFT) snake_2.setDirection(Direction::RIGHT);
 
+            // 3. 鼠标检测
+            bool should_break_wait = false;
             while (MouseHit()) {
                 MOUSEMSG msg = GetMouseMsg();
                 if (msg.uMsg == WM_LBUTTONDOWN) {
                     int btn = renderer.checkGameButtons(msg.x, msg.y, 40);
-                    if (btn == 1) { // 暂停
-                        is_paused = true;
-                        pause_start = std::time(nullptr);
-
-                        int dt = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
-                        renderer.drawDualUI(current_score, score_2, dt, is_paused);
-
-                        should_break_wait = true; // 标记需要跳出外层
-                        break; // 跳出 MouseHit 循环
+                    if (btn == 1) {
+                        is_paused = !is_paused;
+                        if (is_paused) pause_start = std::time(nullptr);
+                        else pause_duration += (std::time(nullptr) - pause_start);
+                        should_break_wait = true;
                     }
-                    if (btn == 2) { // 退出
-                        renderer.close();
-                        return; // 直接返回
-                    }
+                    if (btn == 2) { renderer.close(); return; }
                 }
             }
+            if (should_break_wait) break;
 
-            // 如果点击了暂停，跳出等待循环，让主循环处理暂停逻辑
-            if (should_break_wait) {
-                break;
+            // 4. 暂停渲染
+            if (is_paused) {
+                int display_time = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
+                renderer.drawMap(map);
+                renderer.drawSnake(snake.getBody(), RGB(0, 120, 140), RGB(0, 255, 255)); // P1 青色
+                renderer.drawSnake(snake_2.getBody(), RGB(160, 0, 60), RGB(255, 42, 109)); // P2 粉色
+                renderer.drawDualUI(current_score, score_2, display_time, true);
+                Sleep(100);
+                start_tick = GetTickCount();
+                continue;
             }
 
-            Sleep(10);
+            // 5. 【高频渲染】
+            int display_time = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
+            renderer.drawMap(map);
+
+            // 绘制两条蛇 (使用 VA-11 配色)
+            renderer.drawSnake(snake.getBody(), RGB(0, 120, 140), RGB(0, 255, 255));
+            renderer.drawSnake(snake_2.getBody(), RGB(160, 0, 60), RGB(255, 42, 109));
+
+            renderer.drawDualUI(current_score, score_2, display_time, false);
+
+            Sleep(16); // 60 FPS
         }
 
-        // 如果触发了暂停，直接跳过本次 update/render，进入下一次主循环
-        if (is_paused) continue;
-
-        update();
-
-        if (is_game_over) break;
-
-        // 渲染
-        int display_time = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
-        renderer.drawMap(map);
-        renderer.drawSnake(snake.getBody(), RGB(0, 120, 140), RGB(0, 255, 255));
-        renderer.drawSnake(snake_2.getBody(), RGB(160, 0, 60), RGB(255, 42, 109));
-        renderer.drawDualUI(current_score, score_2, display_time, false);
+        if (!is_paused) {
+            update();
+            if (is_game_over) break;
+        }
     }
 
-    // 游戏结束结算
     renderer.drawDualGameOver(winner);
     renderer.close();
 }

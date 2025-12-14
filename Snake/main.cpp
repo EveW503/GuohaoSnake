@@ -1,12 +1,35 @@
 #include "DataStructure.h"
 #include "GameBase.h"
 
+#include <mmsystem.h>
+#pragma comment(lib, "winmm.lib")
+
+// --- 【核心修改】通用切歌函数 ---
+// 参数 filename: 音乐文件名 (如 "menu.mp3")
+void changeBGM(LPCTSTR filename) {
+    // 1. 先关闭当前正在播放的音乐 (别名 BGM)
+    mciSendString(_T("close BGM"), NULL, 0, NULL);
+
+    // 2. 构造播放命令
+    // open "文件名" alias BGM
+    TCHAR cmd[256];
+    _stprintf_s(cmd, _T("open \"%s\" alias BGM"), filename);
+
+    // 3. 打开并循环播放
+    mciSendString(cmd, NULL, 0, NULL);
+    mciSendString(_T("play BGM repeat"), NULL, 0, NULL);
+}
+
 int main()
 {
+
     while (true) {
         // 1. 菜单阶段
+
         UseEasyX menu;
         menu.initGraph(SCREEN_WIDTH, SCREEN_HEIGHT);
+
+        changeBGM(_T("menu.mp3"));
 
         // 获取菜单选择结果
         int choice = menu.drawMenu();
@@ -38,6 +61,7 @@ int main()
 
         // 3. 运行
         if (game) {
+            changeBGM(_T("game.mp3")); // 切歌！
             game->run();
             delete game;
             game = nullptr;
@@ -46,6 +70,8 @@ int main()
         // 游戏结束后循环回来，再次显示主菜单
     }
 
+    // --- 【新增 3】退出前关闭音乐 ---
+    mciSendString(_T("close BGM"), NULL, 0, NULL);
     closegraph();
     return 0;
 }
