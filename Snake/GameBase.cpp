@@ -375,14 +375,13 @@ void ExpertGame::onSnakeDie()
 DualGame::DualGame(int x_1, int y_1, Direction d_1, int x_2, int y_2, Direction d_2):
     GameBase(12,9,Direction::RIGHT),snake_2(20, 9, Direction::LEFT)
 {
-
+    winner = 0; // 初始化为平局
+    hp = 0;     // 双人模式不需要 HP
 }
 
 void DualGame::run()
 {
     renderer.initGraph(SCREEN_WIDTH, SCREEN_HEIGHT);
-    record_mgr.loadRecords();
-    highest_score = record_mgr.getHighestScore(getVersionName());
 
     start_time = std::time(nullptr);
     food.generateFood(map);
@@ -509,74 +508,98 @@ void DualGame::run()
     }
 
     // 游戏结束结算
-    renderer.drawGameOver(current_score);
-    Sleep(500);
-   
+    renderer.drawDualGameOver(winner);
     renderer.close();
 }
 
 void DualGame::update()
 {
-    // 1. 预判下一步位置
-    Point next_pos_1 = snake.getNextPosition();
-    Point next_pos_2 = snake_2.getNextPosition();
+    // 1. 获取两蛇的下一步位置
+    Point p1_next = snake.getNextPosition();
+    Point p2_next = snake_2.getNextPosition();
 
-    // 2. 碰撞检测：直接查地图
-    BlockType type_1 = map.getBlock(next_pos_1.x, next_pos_1.y);
-
-    // 3. 分支逻辑
-    if (type_1 == BlockType::WALL || type_1 == BlockType::SNAKE_BODY || type_1 == BlockType::SNAKE_HEAD)
-    {
-        // 撞墙或撞自身 -> 触发死亡逻辑 (多态)
-        onSnakeDie();
+    // 2. 【平局判定 1】头对头相撞
+    if (p1_next == p2_next) {
+        winner = 0;
+        is_game_over = true;
+        return;
     }
-    else if (type_1 == BlockType::FOOD)
-    {
-        // --- 吃食物逻辑 ---
 
-        // 1. 蛇变长 (只增不删)
-        snake.addSnake();
+    // 3. 准备碰撞检测
+    // 为了允许“追尾”（比如 P1 的头走到 P2 刚离开的尾巴位置），
+    // 我们需要先检查是否吃食。如果不吃食，尾巴稍后会移走，所以尾巴是安全的。
+    // 但为了逻辑简化和稳定性，这里我们先判断该位置当前的状态。
 
-        // 2. 维护地图数据: 新头的位置设为 SNAKE_HEAD，旧头设为 BODY
-        // (注意：这里需要处理旧头变身体的显示逻辑，addSnake内部实现应由Snake类保证，
-        // 但为了地图同步，我们需要手动设置新头)
-        map.setBlock(BlockType::SNAKE_HEAD, next_pos_1.x, next_pos_1.y);
-        // 获取旧头位置并设为 BODY (略，由渲染层或下一次循环覆盖)
+    BlockType t1 = map.getBlock(p1_next.x, p1_next.y);
+    BlockType t2 = map.getBlock(p2_next.x, p2_next.y);
 
-        // 3. 维护食物状态
-        food.eatFood(next_pos_1); // 从数组移除
-        current_score += 10;    // 加分
-        if (current_score > highest_score) highest_score = current_score;
+    bool p1_die = false;
+    bool p2_die = false;
 
-        // 4. 补货
-        if (food.getCount() == 0)
-        {
-            food.generateFood(map);
-        }
+    // 4. P1 死亡判定 (撞墙、撞身体、撞另一条蛇)
+    // 注意：如果是 FOOD，不算死
+    if (t1 == BlockType::WALL || t1 == BlockType::SNAKE_BODY || t1 == BlockType::SNAKE_HEAD) {
+        // 特殊处理：如果是撞到自己的尾巴且没吃食，或者撞到对方的尾巴且对方没吃食，其实是安全的
+        // 但为了代码简洁，这里采用严格判定：撞到任何非空气非食物即死
+        p1_die = true;
     }
-    else
-    {
-        // --- 普通移动逻辑 (AIR) ---
 
-        // 1. 获取移动前的尾巴位置 (为了清除地图上的痕迹)
-        // 注意：需要 Snake 类提供 getBody()
-        Point old_tail = snake.getBody().back();
+    // 5. P2 死亡判定
+    if (t2 == BlockType::WALL || t2 == BlockType::SNAKE_BODY || t2 == BlockType::SNAKE_HEAD) {
+        p2_die = true;
+    }
 
-        // 2. 蛇内部移动 (头增尾删)
+    // 6. 结算死亡
+    if (p1_die && p2_die) { winner = 0; is_game_over = true; return; }
+    if (p1_die) { winner = 2; is_game_over = true; return; } // P1死，P2赢
+    if (p2_die) { winner = 1; is_game_over = true; return; } // P2死，P1赢
+
+    // 7. 处理 P1 移动/吃食
+    if (t1 == BlockType::FOOD) {
+        snake.addSnake(); // 变长
+        food.eatFood(p1_next); // 清除食物
+        current_score += 10;   // 借用 current_score 存 P1 分数
+    }
+    else {
+        Point tail = snake.getBody().back();
+        map.setBlock(BlockType::AIR, tail.x, tail.y); // 清除尾巴
         snake.moveToNextPosition();
-
-        // 3. 同步地图: 
-        // 旧尾巴变成空气
-        map.setBlock(BlockType::AIR, old_tail.x, old_tail.y);
-        // 新头变成蛇头
-        Point new_head = snake.getBody().front();
-        map.setBlock(BlockType::SNAKE_HEAD, new_head.x, new_head.y);
-
-        // (可选) 稍微修正一下旧头变成身体，虽然渲染器通常能处理
-        if (snake.getBody().size() > 1)
-        {
-            Point old_head = snake.getBody()[1];
-            map.setBlock(BlockType::SNAKE_BODY, old_head.x, old_head.y);
-        }
     }
+    // 更新 P1 新头位置
+    map.setBlock(BlockType::SNAKE_HEAD, p1_next.x, p1_next.y);
+    // 将 P1 旧头标记为身体
+    if (snake.getLength() > 1) {
+        Point old_head = snake.getBody()[1];
+        map.setBlock(BlockType::SNAKE_BODY, old_head.x, old_head.y);
+    }
+
+    // 8. 处理 P2 移动/吃食
+    if (t2 == BlockType::FOOD) {
+        snake_2.addSnake();
+        food.eatFood(p2_next);
+        // 这里没有变量存 P2 分数，可以在 DualGame 加一个 int score2，或者暂时忽略
+    }
+    else {
+        Point tail = snake_2.getBody().back();
+        map.setBlock(BlockType::AIR, tail.x, tail.y);
+        snake_2.moveToNextPosition();
+    }
+    map.setBlock(BlockType::SNAKE_HEAD, p2_next.x, p2_next.y);
+    if (snake_2.getLength() > 1) {
+        Point old_head = snake_2.getBody()[1];
+        map.setBlock(BlockType::SNAKE_BODY, old_head.x, old_head.y);
+    }
+
+    // 9. 补充食物
+    if (food.getCount() < MAX_FOOD_COUNT) {
+        // 简单策略：少于最大值就尝试生成，保持场上食物充足
+        if (rand() % 10 == 0) food.generateFood(map);
+    }
+}
+
+void DualGame::onSnakeDie()
+{
+    // 这个函数可能不会被调用，因为我们在 update 里直接处理了死亡
+    // 但为了接口完整性：
+    is_game_over = true;
 }

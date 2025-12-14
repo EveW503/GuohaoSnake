@@ -180,38 +180,39 @@ void UseEasyX::drawGameOver(int final_score)
 int UseEasyX::drawMenu() {
     int btn_w = 300;
     int btn_h = 50;
-    int start_y = 200; // 按钮起始高度
-    int gap = 70;      // 按钮间距
+    int start_y = 180; // 稍微上移一点
+    int gap = 60;      // 间距调小一点以容纳更多按钮
     int center_x = (SCREEN_WIDTH - btn_w) / 2;
 
     while (true) {
         cleardevice();
 
-        // 1. 标题
+        // 标题
         settextstyle(60, 0, _T("Arial"));
         settextcolor(YELLOW);
         LPCTSTR title = _T("SNAKE GAME C++");
-        outtextxy((SCREEN_WIDTH - textwidth(title)) / 2, 80, title);
+        outtextxy((SCREEN_WIDTH - textwidth(title)) / 2, 60, title);
 
-        // 2. 绘制 5 个按钮
+        // 绘制 6 个按钮
         drawButton(center_x, start_y, btn_w, btn_h, _T("1. Intro Mode"), GREEN);
         drawButton(center_x, start_y + gap, btn_w, btn_h, _T("2. Advanced Mode"), BLUE);
         drawButton(center_x, start_y + gap * 2, btn_w, btn_h, _T("3. Expert Mode"), RED);
-        drawButton(center_x, start_y + gap * 3, btn_w, btn_h, _T("History Records"), LIGHTGRAY);
-        drawButton(center_x, start_y + gap * 4, btn_w, btn_h, _T("Exit Game"), DARKGRAY);
+        drawButton(center_x, start_y + gap * 3, btn_w, btn_h, _T("4. Dual Mode (1v1)"), MAGENTA); // 【新增】
+        drawButton(center_x, start_y + gap * 4, btn_w, btn_h, _T("History Records"), LIGHTGRAY);
+        drawButton(center_x, start_y + gap * 5, btn_w, btn_h, _T("Exit Game"), DARKGRAY);
 
         FlushBatchDraw();
 
-        // 3. 鼠标交互
+        // 鼠标交互
         if (MouseHit()) {
             MOUSEMSG msg = GetMouseMsg();
             if (msg.uMsg == WM_LBUTTONDOWN) {
-                // 判断点击了哪个按钮
                 if (isClickIn(msg.x, msg.y, center_x, start_y, btn_w, btn_h)) return 1;
                 if (isClickIn(msg.x, msg.y, center_x, start_y + gap, btn_w, btn_h)) return 2;
                 if (isClickIn(msg.x, msg.y, center_x, start_y + gap * 2, btn_w, btn_h)) return 3;
-                if (isClickIn(msg.x, msg.y, center_x, start_y + gap * 3, btn_w, btn_h)) return 4; // 历史
-                if (isClickIn(msg.x, msg.y, center_x, start_y + gap * 4, btn_w, btn_h)) return 5; // 退出
+                if (isClickIn(msg.x, msg.y, center_x, start_y + gap * 3, btn_w, btn_h)) return 4; // 双人
+                if (isClickIn(msg.x, msg.y, center_x, start_y + gap * 4, btn_w, btn_h)) return 5; // 历史
+                if (isClickIn(msg.x, msg.y, center_x, start_y + gap * 5, btn_w, btn_h)) return 6; // 退出
             }
         }
         Sleep(10);
@@ -540,3 +541,89 @@ void UseEasyX::drawHistory(RecordManager& mgr) {
         Sleep(10);
     }
 }
+
+void UseEasyX::drawDualGameOver(int winner)
+{
+    FlushBatchDraw();
+
+    int center_x = SCREEN_WIDTH / 2;
+    int center_y = SCREEN_HEIGHT / 2;
+
+    // 1. 标题
+    settextstyle(60, 0, _T("Arial"));
+
+    LPCTSTR text = _T("GAME OVER");
+    if (winner == 1) {
+        settextcolor(GREEN);
+        text = _T("PLAYER 1 WINS!");
+    }
+    else if (winner == 2) {
+        settextcolor(LIGHTBLUE);
+        text = _T("PLAYER 2 WINS!");
+    }
+    else {
+        settextcolor(YELLOW);
+        text = _T("DRAW GAME!");
+    }
+
+    int w = textwidth(text);
+    outtextxy(center_x - w / 2, center_y - 50, text);
+
+    // 2. 退出提示
+    LPCTSTR tip = _T("Press SPACE to return to menu...");
+    settextstyle(24, 0, _T("Consolas"));
+    settextcolor(WHITE);
+    w = textwidth(tip);
+    outtextxy(center_x - w / 2, center_y + 50, tip);
+
+    FlushBatchDraw();
+
+    // 等待按空格退出
+    while (true) {
+        if (GetAsyncKeyState(VK_SPACE) & 0x8000) break;
+        Sleep(10);
+    }
+}
+
+void UseEasyX::drawDualUI(int score1, int score2, int game_time_seconds, bool is_paused)
+{
+    // 1. 绘制基本文字信息
+    settextcolor(WHITE);
+    settextstyle(24, 0, _T("Consolas"));
+
+    TCHAR str_buf[128];
+
+    // 显示时间
+    _stprintf_s(str_buf, _T("Time: %02d:%02d"), game_time_seconds / 60, game_time_seconds % 60);
+    outtextxy(SCREEN_WIDTH / 2 - 60, 20, str_buf); // 时间居中
+
+    // 显示 P1 分数 (左上角，绿色)
+    settextcolor(GREEN);
+    _stprintf_s(str_buf, _T("P1 Score: %d"), score1);
+    outtextxy(20, 20, str_buf);
+
+    // 显示 P2 分数 (右上角，蓝色 - 需要根据 SCREEN_WIDTH 倒推位置)
+    settextcolor(LIGHTBLUE);
+    _stprintf_s(str_buf, _T("P2 Score: %d"), score2);
+    int p2_w = textwidth(str_buf);
+    outtextxy(SCREEN_WIDTH - p2_w - 20, 20, str_buf); // 靠右显示
+
+    // 2. 绘制功能按钮 (暂停/菜单) - 复用原来的位置
+    drawButton(BTN_PAUSE_X, BTN_PAUSE_Y + 40, BTN_W, BTN_H, // 稍微下移一点避开分数
+        is_paused ? _T("RESUME") : _T("PAUSE"),
+        is_paused ? GREEN : BROWN);
+
+    drawButton(BTN_RETURN_X, BTN_RETURN_Y + 40, BTN_W, BTN_H, _T("MENU"), RED);
+
+    // 3. 绘制屏幕中央的暂停提示
+    if (is_paused) {
+        settextstyle(80, 0, _T("Arial"));
+        settextcolor(YELLOW);
+        LPCTSTR p_text = _T("GAME PAUSED");
+        int text_w = textwidth(p_text);
+        int text_h = textheight(p_text);
+        outtextxy((SCREEN_WIDTH - text_w) / 2, (SCREEN_HEIGHT - text_h) / 2, p_text);
+    }
+
+    FlushBatchDraw();
+};

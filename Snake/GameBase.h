@@ -72,6 +72,7 @@ protected:
 class DualGame : public GameBase {
 private:
     Snake snake_2;
+    int winner; // 【新增】记录胜者: 0=平局, 1=P1赢, 2=P2赢
 public:
     DualGame(int x_1, int y_1, Direction d_1, int x_2, int y_2, Direction d_2);
     ~DualGame() {};
@@ -79,4 +80,5 @@ public:
 protected:
     void onSnakeDie() override;
     void update() override;
+    std::string getVersionName() const override { return "Dual"; }
 };

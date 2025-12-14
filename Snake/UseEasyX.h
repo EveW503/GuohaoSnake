@@ -15,6 +15,9 @@ public:
     // 【修改】增加 is_paused 参数，用于显示“暂停/继续”按钮的不同文字
     void drawUI(int current_score, int high_score, int snake_len, int hp, int game_time_seconds, bool is_paused);
 
+    // 【新增】双人专用UI，显示两名玩家的分数
+    void drawDualUI(int score1, int score2, int game_time_seconds, bool is_paused);
+
     void drawMap(GameMap& map);
     void drawSnake(const std::deque<Point>& snake_body, COLORREF body_color, COLORREF head_color);
     void drawGameOver(int final_score);
@@ -31,6 +34,8 @@ public:
 
     // 【新增】检查游戏内按钮点击 (返回 0:无, 1:暂停, 2:返回菜单)
     int checkGameButtons(int mouse_x, int mouse_y);
+
+    void drawDualGameOver(int winner);
 
 private:
     // 【新增】内部辅助：画一个按钮

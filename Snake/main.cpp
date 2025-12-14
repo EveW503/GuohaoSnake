@@ -12,12 +12,12 @@ int main()
         int choice = menu.drawMenu();
 
         // 处理特殊选项
-        if (choice == 5) { // 退出游戏
+        if (choice == 6) { // 退出游戏
             menu.close();
             break;
         }
 
-        if (choice == 4) { // 查看历史记录
+        if (choice == 5) { // 查看历史记录
             RecordManager temp_mgr; // 临时创建一个管理器读取数据
             temp_mgr.loadRecords();
             menu.drawHistory(temp_mgr);
@@ -32,6 +32,8 @@ int main()
         case 1: game = new IntroGame(); break;
         case 2: game = new AdvancedGame(); break;
         case 3: game = new ExpertGame(); break;
+            // 【新增】双人模式：P1(左侧,向右) vs P2(右侧,向左)
+        case 4: game = new DualGame(5, 9, Direction::RIGHT, MAP_WIDTH - 6, 9, Direction::LEFT); break;
         }
 
         // 3. 运行
