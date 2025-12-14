@@ -439,28 +439,30 @@ void DualGame::run()
         int frame_wait_time = 150 - (current_score / 5);
         if (frame_wait_time < 50) frame_wait_time = 50;
 
-        Direction current_dir = snake.getDirection();
+        Direction current_dir_1 = snake.getDirection();   // 蛇一方向
+        Direction current_dir_2 = snake_2.getDirection(); // 【新增】蛇二方向
+
         DWORD start_tick = GetTickCount();
 
-        // 等待期间检测输入 (非阻塞延时)
         while (GetTickCount() - start_tick < (DWORD)frame_wait_time) {
-            // 键盘控制
-            if ((GetAsyncKeyState('W') & 0x8000) && current_dir != Direction::DOWN)
+            // 1. 蛇一控制 (使用 current_dir_1)
+            if ((GetAsyncKeyState('W') & 0x8000) && current_dir_1 != Direction::DOWN)
                 snake.setDirection(Direction::UP);
-            else if ((GetAsyncKeyState('S') & 0x8000) && current_dir != Direction::UP)
+            else if ((GetAsyncKeyState('S') & 0x8000) && current_dir_1 != Direction::UP)
                 snake.setDirection(Direction::DOWN);
-            else if ((GetAsyncKeyState('A') & 0x8000) && current_dir != Direction::RIGHT)
+            else if ((GetAsyncKeyState('A') & 0x8000) && current_dir_1 != Direction::RIGHT)
                 snake.setDirection(Direction::LEFT);
-            else if ((GetAsyncKeyState('D') & 0x8000) && current_dir != Direction::LEFT)
+            else if ((GetAsyncKeyState('D') & 0x8000) && current_dir_1 != Direction::LEFT)
                 snake.setDirection(Direction::RIGHT);
 
-            if ((GetAsyncKeyState(VK_UP) & 0x8000) && current_dir != Direction::DOWN)
+            // 2. 蛇二控制 (使用 current_dir_2) 【修复点】
+            if ((GetAsyncKeyState(VK_UP) & 0x8000) && current_dir_2 != Direction::DOWN)
                 snake_2.setDirection(Direction::UP);
-            else if ((GetAsyncKeyState(VK_DOWN) & 0x8000) && current_dir != Direction::UP)
+            else if ((GetAsyncKeyState(VK_DOWN) & 0x8000) && current_dir_2 != Direction::UP)
                 snake_2.setDirection(Direction::DOWN);
-            else if ((GetAsyncKeyState(VK_LEFT) & 0x8000) && current_dir != Direction::RIGHT)
+            else if ((GetAsyncKeyState(VK_LEFT) & 0x8000) && current_dir_2 != Direction::RIGHT) // 现在逻辑正确了
                 snake_2.setDirection(Direction::LEFT);
-            else if ((GetAsyncKeyState(VK_RIGHT) & 0x8000) && current_dir != Direction::LEFT)
+            else if ((GetAsyncKeyState(VK_RIGHT) & 0x8000) && current_dir_2 != Direction::LEFT)
                 snake_2.setDirection(Direction::RIGHT);
 
             // 【关键修复】等待期间也要检测鼠标
@@ -500,6 +502,8 @@ void DualGame::run()
 
         update();
 
+        if (is_game_over) break;
+
         // 渲染
         int display_time = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
         renderer.drawMap(map);
@@ -518,6 +522,13 @@ void DualGame::update()
     // 1. 获取两蛇的下一步位置
     Point p1_next = snake.getNextPosition();
     Point p2_next = snake_2.getNextPosition();
+
+    bool p1_out = (p1_next.x < 0 || p1_next.x >= MAP_WIDTH || p1_next.y < 0 || p1_next.y >= MAP_HEIGHT);
+    bool p2_out = (p2_next.x < 0 || p2_next.x >= MAP_WIDTH || p2_next.y < 0 || p2_next.y >= MAP_HEIGHT);
+
+    if (p1_out && p2_out) { winner = 0; is_game_over = true; return; }
+    if (p1_out) { winner = 2; is_game_over = true; return; }
+    if (p2_out) { winner = 1; is_game_over = true; return; }
 
     // 2. 【平局判定 1】头对头相撞
     if (p1_next == p2_next) {
@@ -592,9 +603,8 @@ void DualGame::update()
     }
 
     // 9. 补充食物
-    if (food.getCount() < MAX_FOOD_COUNT) {
-        // 简单策略：少于最大值就尝试生成，保持场上食物充足
-        if (rand() % 10 == 0) food.generateFood(map);
+    if (food.getCount() < 2) {
+        food.generateFood(map);
     }
 }
 
