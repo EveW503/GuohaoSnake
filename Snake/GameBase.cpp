@@ -603,7 +603,8 @@ void DualGame::update()
     }
 
     // 9. ≤π≥‰ ≥ŒÔ
-    if (food.getCount() < 2) {
+    if (food.getCount() == 0)
+    {
         food.generateFood(map);
     }
 }

@@ -53,6 +53,11 @@ void Food::generateFood(GameMap& map)
 
     for (int k = 0; k < spawnCount; k++)
     {
+
+        if (current_food_count >= MAX_FOOD_COUNT) {
+            break; // 数组已满，停止生成
+        }
+
         int x, y;
         bool success = false;
         int tryCount = 0;
