@@ -1,9 +1,4 @@
-Advanced Player22 290
-Intro 12312312 20
-Intro Player 10
-Expert 21312 10
-Intro  21 10
-Intro 231241251251251251251 0
-Intro Anonymous 0
-Intro Player 0
-Intro Player 0
+Intro Player 250
+Intro 21312 50
+Intro awda 20
+Intro t 10

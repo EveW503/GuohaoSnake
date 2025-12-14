@@ -11,14 +11,16 @@
 // 抽象基类
 class GameBase {
 protected:
+    RecordManager record_mgr;   // 存档管理器
     // 核心对象
     Snake snake;
     GameMap map;
-    Food food;
 
     // 工具对象
     UseEasyX renderer;          // 渲染器
-    RecordManager record_mgr;   // 存档管理器
+
+
+    Food food;
 
     // 【数据源】游戏状态数据 (snake_case)
     bool is_game_over;
@@ -76,7 +78,6 @@ private:
     int winner; // 【新增】记录胜者: 0=平局, 1=P1赢, 2=P2赢
 public:
     DualGame(int x_1, int y_1, Direction d_1, int x_2, int y_2, Direction d_2);
-    ~DualGame() {};
     void run() override;
 protected:
     void onSnakeDie() override;
