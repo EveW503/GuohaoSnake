@@ -1,72 +1,71 @@
 #include "Food.h"
 #include "GameMap.h"
-#include <ctime>
+#include <algorithm> // 用于 std::remove_if (可选，这里用手动循环也行)
 
-Food::Food() 
+Food::Food()
 {
-    current_food_count = 0;
-    for (int i = 0; i < MAX_FOOD_COUNT; i++) 
-    {
-        food_positions[i] = { -1, -1 };
-    }
+    // vector 自动初始化，无需手动循环赋值 -1
+    food_list.clear();
 }
 
 Food::~Food() {};
 
 void Food::eatFood(Point p)
 {
-    for (int i = 0; i < current_food_count; i++)
+    // 使用迭代器遍历并删除
+    for (auto it = food_list.begin(); it != food_list.end(); ++it)
     {
-        if (food_positions[i] == p)
+        if (it->x == p.x && it->y == p.y)
         {
-            food_positions[i] = food_positions[current_food_count - 1];
-            current_food_count--;
-            return;
+            food_list.erase(it); // 安全删除，vector 自动处理后续元素前移
+            return; // 吃一个就返回
         }
     }
 }
 
-void Food::generateFood(GameMap& map) 
+void Food::generateFood(GameMap& map)
 {
     static std::mt19937 rng(static_cast<unsigned int>(std::time(nullptr)));
+    // 限制生成区域
     std::uniform_int_distribution<int> distX(1, MAP_WIDTH - 2);
     std::uniform_int_distribution<int> distY(1, MAP_HEIGHT - 2);
-    std::uniform_int_distribution<int> distCount(1, MAX_FOOD_COUNT);
 
-    // 【修改点 1：清理旧食物】----------------------------------------
-    // 在生成新食物前，必须先把地图上现有的食物清除掉
-    // 否则地图上会残留上一轮的食物，导致数量越积越多
-    for (int i = 0; i < current_food_count; i++)
+    // 假设最大同时也只有 5 个食物
+    const int TARGET_MAX_FOOD = 5;
+    std::uniform_int_distribution<int> distCount(1, TARGET_MAX_FOOD);
+
+    // 1. 清理地图上旧的食物
+    for (const auto& p : food_list)
     {
-        Point p = food_positions[i];
-        // 确保该位置确实是食物（防止覆盖了已经被蛇身或其他物体占据的格子）
         if (map.getBlock(p.x, p.y) == BlockType::FOOD) {
             map.setBlock(BlockType::AIR, p.x, p.y);
         }
     }
-    // -----------------------------------------------------------------
 
-    // 重置计数
-    current_food_count = 0;
+    // 2. 清空列表
+    food_list.clear();
 
+    // 3. 生成新食物
     int spawnCount = distCount(rng);
 
     for (int k = 0; k < spawnCount; k++)
     {
-
-        if (current_food_count >= MAX_FOOD_COUNT) {
-            break; // 数组已满，停止生成
+        // vector 动态增长，理论上不会溢出。
+        // 但为了游戏平衡，如果已经存了太多，可以停止生成
+        if (food_list.size() >= TARGET_MAX_FOOD) {
+            break;
         }
 
         int x, y;
         bool success = false;
         int tryCount = 0;
 
+        // 尝试随机位置
         while (tryCount < 200)
         {
             x = distX(rng);
             y = distY(rng);
-            if (map.getBlock(x, y) == BlockType::AIR) 
+            if (map.getBlock(x, y) == BlockType::AIR)
             {
                 success = true;
                 break;
@@ -74,11 +73,12 @@ void Food::generateFood(GameMap& map)
             tryCount++;
         }
 
+        // 兜底策略：遍历地图找空位
         if (!success)
         {
-            for (int i = 1; i < MAP_WIDTH - 1 && !success; i++) 
+            for (int i = 1; i < MAP_WIDTH - 1 && !success; i++)
             {
-                for (int j = 1; j < MAP_HEIGHT - 1; j++) 
+                for (int j = 1; j < MAP_HEIGHT - 1; j++)
                 {
                     if (map.getBlock(i, j) == BlockType::AIR)
                     {
@@ -90,10 +90,10 @@ void Food::generateFood(GameMap& map)
             }
         }
 
-        if (success) 
+        if (success)
         {
-            food_positions[current_food_count] = { x, y };
-            current_food_count++;
+            // 【关键】使用 push_back，永远不会越界写到堆元数据上
+            food_list.push_back({ x, y });
             map.setBlock(BlockType::FOOD, x, y);
         }
     }
@@ -101,5 +101,5 @@ void Food::generateFood(GameMap& map)
 
 int Food::getCount() const
 {
-    return current_food_count;
+    return (int)food_list.size();
 }
