@@ -20,22 +20,28 @@ const int BTN_RETURN_Y = 10;
 const int BTN_PAUSE_X = SCREEN_WIDTH - 240;  // 暂停按钮 X
 const int BTN_PAUSE_Y = 10;
 
+bool UseEasyX::is_graph_initialized = false;
+
 void UseEasyX::initGraph(int width, int height)
 {
-    // 1. 初始化绘图窗口
-    initgraph(width, height);
+    if (!is_graph_initialized)
+    {
+        initgraph(width, height);
 
-    // 2. 设置背景模式为透明 (让文字背景不遮挡)
+        // 开启双缓冲，且永远不关闭它，防止闪烁和状态错乱
+        BeginBatchDraw();
+
+        is_graph_initialized = true;
+    }
+
+    // 设置背景透明 (这个操作是安全的，可以重复调用)
     setbkmode(TRANSPARENT);
-
-    // 3. 开启批量绘图模式 (双缓冲)，防止闪烁
-    BeginBatchDraw();
 }
 
 void UseEasyX::close()
 {
-    EndBatchDraw();
-    closegraph();
+    cleardevice();
+    FlushBatchDraw(); // 刷新一下清空的屏幕
 }
 
 void UseEasyX::drawMap(GameMap& map)

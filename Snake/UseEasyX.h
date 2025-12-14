@@ -9,6 +9,9 @@
 
 class UseEasyX {
 public:
+
+    static bool is_graph_initialized;
+
     void initGraph(int width, int height);
     void close();
 

@@ -46,5 +46,6 @@ int main()
         // 游戏结束后循环回来，再次显示主菜单
     }
 
+    closegraph();
     return 0;
 }
