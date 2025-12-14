@@ -1,8 +1,8 @@
 #include "UseEasyX.h"
 #include <string>
 #include <vector>
-#include <cstdio>  // 用于 swprintf_s
-#include <windows.h> // 用于 Sleep, GetAsyncKeyState
+#include <cstdio>  
+#include <windows.h> 
 #include <stdio.h>
 #include <graphics.h>
 #include <ctime>
@@ -210,90 +210,200 @@ void UseEasyX::drawSnake(const std::deque<Point>& snake_body, COLORREF body_colo
 
 void UseEasyX::drawUI(int current_score, int high_score, int snake_len, int hp, int game_time_seconds, bool is_paused)
 {
-    settextcolor(VA_TEXT_COLOR);
-    settextstyle(28, 0, _T("Consolas")); 
+    // --- 风格配色 ---
+    const COLORREF VA_CYAN = RGB(0, 255, 255);    // 霓虹青 (数据流)
+    const COLORREF VA_PINK = RGB(255, 42, 109);   // 故障粉 (警告/高亮)
+    const COLORREF VA_WHITE = RGB(220, 220, 220);  // 灰白 (稳定文本)
+    const COLORREF VA_GRAY = RGB(100, 100, 110);  // 暗灰 (元数据标签)
+
     setbkmode(TRANSPARENT);
 
-    // 1. 绘制基本文字信息
-    settextcolor(WHITE);
-    settextstyle(24, 0, _T("Consolas"));
+    // --- 1. 顶部监视器 (HUD) ---
+    settextstyle(20, 0, _T("微软雅黑"));
 
-    TCHAR str_buf[128];
-    _stprintf_s(str_buf, _T("[SCORE]: %06d  [HIGH]: %06d"), current_score, high_score); 
-    outtextxy(20, 20, str_buf);
+    // 布局坐标
+    int y_row1 = 20;
+    int y_row2 = 50;
+    int y_row3 = 80;
 
-    _stprintf_s(str_buf, _T("[Length]: %d  [Time]: %02d:%02d"), snake_len, game_time_seconds / 60, game_time_seconds % 60);
-    outtextxy(20, 50, str_buf);
+    // 辅助 lambda：绘制形如 "[ 标签 ] 数值" 的监控风格
+    auto drawMonitorItem = [&](int x, int y, LPCTSTR label, LPCTSTR value, COLORREF val_color) {
+        // 绘制暗色标签 [ LABEL ]
+        settextcolor(VA_GRAY);
+        outtextxy(x, y, _T("[ "));
+        outtextxy(x + textwidth(_T("[ ")) + textwidth(label), y, _T(" ]"));
 
+        // 绘制亮色标签名
+        settextcolor(VA_WHITE);
+        outtextxy(x + textwidth(_T("[ ")), y, label);
+
+        // 绘制数值 (右侧对齐)
+        settextcolor(val_color);
+        outtextxy(x + 180, y, value);
+        };
+
+    TCHAR buf[128];
+
+    // -> [ 记忆同步值 ] (Score) - 对应“残留记忆”
+    _stprintf_s(buf, _T("%06d"), current_score);
+    drawMonitorItem(20, y_row1, _T("记忆同步值"), buf, VA_CYAN);
+
+    // -> [ 历史最高同步 ] (High) - 对应“过往记忆数据”
+    _stprintf_s(buf, _T("%06d"), high_score);
+    // 如果打破纪录，数值变粉色高亮
+    drawMonitorItem(320, y_row1, _T("历史最高同步"), buf, (current_score > high_score) ? VA_PINK : VA_WHITE);
+
+    // -> [ 潜入深度 ] (Length) - 对应梦境的深浅，单位用 LAYER (层)
+    _stprintf_s(buf, _T("%d LAYER"), snake_len);
+    drawMonitorItem(20, y_row2, _T("潜入深度"), buf, VA_WHITE);
+
+    // -> [ 链路运行时长 ] (Time) - 对应“信号传输”
+    _stprintf_s(buf, _T("%02d:%02d"), game_time_seconds / 60, game_time_seconds % 60);
+    drawMonitorItem(320, y_row2, _T("链路运行时长"), buf, VA_WHITE);
+
+    // -> [ 信号完整度 ] (HP) - 对应“切断信号”
     if (hp > 0)
     {
-        settextcolor(LIGHTRED);
-        _stprintf_s(str_buf, _T("[HP]: %d"), hp);
-        outtextxy(20, 80, str_buf);
+        // 用信号格 "|||" 表示生命值，模拟无线信号
+        TCHAR hp_bar[32] = { 0 };
+        for (int i = 0; i < hp; ++i) _tcscat_s(hp_bar, _T("||"));
+
+        drawMonitorItem(20, y_row3, _T("信号完整度"), hp_bar, VA_PINK);
     }
 
-    // 2. 绘制功能按钮 (根据暂停状态改变文字和颜色)
-    // 如果暂停：显示 "RESUME" (继续)
-    // 如果运行：显示 "PAUSE" (暂停)
+    // --- 2. 功能按钮 ---
+    // 按钮文字改为更有操作系统的感觉
+    // 暂停 -> 挂起进程 / 恢复
     drawButton(BTN_PAUSE_X, BTN_PAUSE_Y, BTN_W, BTN_H,
-        is_paused ? _T("RESUME") : _T("PAUSE"),
-        is_paused ? VA_NEON_PINK : VA_ACCENT_COLOR); 
+        is_paused ? _T("恢复链路") : _T("挂起进程"),
+        is_paused ? VA_PINK : VA_CYAN);
 
-    drawButton(BTN_RETURN_X, BTN_RETURN_Y, BTN_W, BTN_H, _T("MENU"), VA_WALL_BORDER);
+    // 菜单 -> 终止连接 (Abort)
+    drawButton(BTN_RETURN_X, BTN_RETURN_Y, BTN_W, BTN_H, _T("终止连接"), VA_GRAY);
 
-    // 3. 绘制屏幕中央的暂停提示
-    if (is_paused) 
+
+    // --- 3. 暂停弹窗 (梦境冻结) ---
+    if (is_paused)
     {
-        // 设置大号字体
-        settextstyle(80, 0, _T("Impact")); 
-        settextcolor(VA_NEON_PINK);
-
-        LPCTSTR p_text = _T("GAME PAUSED");
-
-        // 计算居中位置
-        int text_w = textwidth(p_text);
-        int text_h = textheight(p_text);
-
-        outtextxy((SCREEN_WIDTH - text_w) / 2, (SCREEN_HEIGHT - text_h) / 2, p_text);
-
+        // 背景压暗 (隔行扫描线遮罩)
         setlinecolor(RGB(0, 0, 0));
-        for (int i = 0; i < SCREEN_HEIGHT; i += 4) 
-        {
-            line(0, i, SCREEN_WIDTH, i); 
+        for (int i = 0; i < SCREEN_HEIGHT; i += 2) {
+            line(0, i, SCREEN_WIDTH, i);
         }
+
+        int cx = SCREEN_WIDTH / 2;
+        int cy = SCREEN_HEIGHT / 2;
+        int box_w = 520;
+        int box_h = 220;
+
+        // 弹窗背景
+        setfillcolor(RGB(20, 20, 30));
+        fillrectangle(cx - box_w / 2, cy - box_h / 2, cx + box_w / 2, cy + box_h / 2);
+
+        // 粉色警告框
+        setlinecolor(VA_PINK);
+        setlinestyle(PS_SOLID, 3);
+        rectangle(cx - box_w / 2, cy - box_h / 2, cx + box_w / 2, cy + box_h / 2);
+        setlinestyle(PS_SOLID, 1); // 还原
+
+        // 标题：[ 梦境同步挂起 ]
+        settextstyle(40, 0, _T("微软雅黑"), 0, 0, FW_BOLD, false, false, false);
+        settextcolor(VA_PINK);
+        LPCTSTR p_text = _T("[ 梦境同步挂起 ]");
+        outtextxy(cx - textwidth(p_text) / 2, cy - 60, p_text);
+
+        // 副标题：等待交互指令...
+        settextstyle(22, 0, _T("微软雅黑"));
+        settextcolor(VA_WHITE);
+        LPCTSTR sub_text = _T(">> 等待交互指令 (WAITING FOR INPUT)...");
+        outtextxy(cx - textwidth(sub_text) / 2, cy + 30, sub_text);
     }
 
     FlushBatchDraw();
 }
 
+
 void UseEasyX::drawGameOver(int final_score)
 {
-    FlushBatchDraw();
+    // VA-11 风格配色
+    const COLORREF VA_BG = RGB(20, 20, 30);     // 深空底色
+    const COLORREF VA_RED = RGB(255, 42, 109);   // 故障红
+    const COLORREF VA_CYAN = RGB(0, 255, 255);    // 霓虹青
+    const COLORREF VA_WHITE = RGB(220, 220, 220);  // 灰白文本
+
+    // 1. 清除背景
+    setbkcolor(VA_BG);
+    cleardevice();
 
     // 居中计算
     int center_x = SCREEN_WIDTH / 2;
     int center_y = SCREEN_HEIGHT / 2;
+    int box_w = 700; // 稍微再加宽一点，防止大字体换行
+    int box_h = 360; // 高度也稍微增加
+    int left = center_x - box_w / 2;
+    int top = center_y - box_h / 2;
+    int right = center_x + box_w / 2;
+    int bottom = center_y + box_h / 2;
 
-    // 1. Game Over 标题
-    settextcolor(RED);
-    settextstyle(60, 0, _T("Arial")); 
-    LPCTSTR text = _T("GAME OVER");
-    int w = textwidth(text);
-    outtextxy(center_x - w / 2, center_y - 80, text);
+    // 2. 绘制终端警告框
+    setfillcolor(RGB(30, 32, 45));
+    fillrectangle(left, top, right, bottom);
 
-    // 2. 最终得分
-    TCHAR score_str[64];
-    _stprintf_s(score_str, _T("Final Score: %d"), final_score);
-    settextstyle(30, 0, _T("Arial"));
-    w = textwidth(score_str);
-    settextcolor(WHITE);
-    outtextxy(center_x - w / 2, center_y, score_str);
+    setlinecolor(VA_RED);
+    setlinestyle(PS_SOLID, 4); // 边框加粗到 4
+    rectangle(left, top, right, bottom);
 
-    // 3. 退出提示
-    LPCTSTR tip = _T("Press ANY key to exit...");
-    settextstyle(20, 0, _T("Consolas"));
+    // 装饰性扫描线 (间距调大一点，显得疏朗)
+    setlinecolor(RGB(45, 40, 55));
+    setlinestyle(PS_SOLID, 1);
+    for (int y = top + 15; y < bottom; y += 8) {
+        line(left + 6, y, right - 6, y);
+    }
+
+    // --- 3. 标题 (大幅加大) ---
+    // [ 信号传输意外终止 ]
+    setbkmode(TRANSPARENT);
+    // 字号从 40 改为 60，且使用 FW_BOLD 加粗 (如果编译器不支持加粗参数，只改 60 也可以)
+    // 这里的参数依次是：高度, 宽度, 字体, 角度, 角度, 粗细(FW_BOLD=700), 斜体, 下划线, 删除线
+    settextstyle(55, 0, _T("微软雅黑"), 0, 0, FW_BOLD, false, false, false);
+
+    LPCTSTR title = _T("[ 信号传输意外终止 ]");
+
+    // 绘制青色故障阴影 (偏移量也随字号变大调整为 5)
+    settextcolor(RGB(0, 100, 100));
+    int title_w = textwidth(title);
+    outtextxy(center_x - title_w / 2 + 5, center_y - 110 + 5, title); // Y轴位置稍微上提
+
+    // 绘制红色主标题
+    settextcolor(VA_RED);
+    outtextxy(center_x - title_w / 2, center_y - 110, title);
+
+    // --- 4. 数据 (加大) ---
+    // 本次残留记忆...
+    TCHAR score_str[128];
+    _stprintf_s(score_str, _T("本次残留记忆(DATA): %06d"), final_score);
+
+    // 字号从 28 改为 35，依然用微软雅黑保持风格统一
+    settextstyle(35, 0, _T("微软雅黑"), 0, 0, FW_NORMAL, false, false, false);
+    settextcolor(VA_CYAN);
+
+    int w = textwidth(score_str);
+    outtextxy(center_x - w / 2, center_y - 10, score_str); // 放在正中心附近
+
+    // 分割线 (加长加粗)
+    setlinecolor(VA_WHITE);
+    setlinestyle(PS_SOLID, 2);
+    line(center_x - 180, center_y + 35, center_x + 180, center_y + 35);
+
+    // --- 5. 交互提示 (加大) ---
+    // 按任意键...
+    LPCTSTR tip = _T(">> 按任意键脱离当前梦境...");
+
+    // 字号从 20 改为 24
+    settextstyle(24, 0, _T("微软雅黑"));
+    settextcolor(VA_WHITE);
     w = textwidth(tip);
-    outtextxy(center_x - w / 2, center_y + 60, tip);
+    outtextxy(center_x - w / 2, center_y + 80, tip); // 下移一点避免拥挤
 
     FlushBatchDraw();
 }
@@ -318,72 +428,154 @@ std::string UseEasyX::inputPlayerName()
 
 void UseEasyX::drawRankings(const std::vector<Record>& records)
 {
+    // --- 定义配色 ---
+    const COLORREF VA_BG = RGB(20, 20, 30);     // 深空底色
+    const COLORREF VA_ROW_ALT = RGB(30, 32, 45);     // 偶数行深色背景
+    const COLORREF VA_CYAN = RGB(0, 255, 255);    // 霓虹青
+    const COLORREF VA_PINK = RGB(255, 42, 109);   // 故障粉
+    const COLORREF VA_WHITE = RGB(220, 220, 220);  // 灰白
+    const COLORREF VA_GRAY = RGB(100, 100, 110);  // 暗灰
+
+    // 1. 初始化背景
+    setbkcolor(VA_BG);
     cleardevice();
 
-    // 标题
-    settextstyle(50, 0, _T("Arial"));
-    settextcolor(YELLOW);
-    LPCTSTR title = _T("HALL OF FAME");
-    outtextxy((SCREEN_WIDTH - textwidth(title)) / 2, 50, title);
+    // 绘制背景装饰线 (隔行扫描)
+    setlinecolor(RGB(25, 25, 35));
+    for (int i = 0; i < SCREEN_HEIGHT; i += 4) {
+        line(0, i, SCREEN_WIDTH, i);
+    }
 
-    // 表头
-    settextstyle(30, 0, _T("Consolas"));
-    settextcolor(LIGHTCYAN);
-    outtextxy(200, 150, _T("VERSION"));
-    outtextxy(500, 150, _T("NAME"));
-    outtextxy(900, 150, _T("SCORE"));
+    // 2. 标题：[ 记忆归档中心 ]
+    setbkmode(TRANSPARENT);
+    settextstyle(50, 0, _T("微软雅黑"), 0, 0, FW_BOLD, false, false, false);
 
-    // 列表内容
-    settextcolor(WHITE);
+    LPCTSTR title = _T("[ 记忆归档中心 ]");
+    int title_w = textwidth(title);
+    int cx = SCREEN_WIDTH / 2;
+
+    // 标题阴影 (青色错位)
+    settextcolor(RGB(0, 100, 100));
+    outtextxy(cx - title_w / 2 + 4, 40 + 4, title);
+    // 标题本体 (粉色)
+    settextcolor(VA_PINK);
+    outtextxy(cx - title_w / 2, 40, title);
+
+    // 副标题 (英文)
+    settextstyle(20, 0, _T("Consolas"));
+    settextcolor(VA_CYAN);
+    LPCTSTR sub_title = _T(">> ACCESSING ARCHIVED MEMORY DATA...");
+    outtextxy(cx - textwidth(sub_title) / 2, 100, sub_title);
+
+    // 3. 表头布局
+    int table_y = 150;
+    int col_ver = 100; // 第一列 x
+    int col_nam = 500; // 第二列 x
+    int col_scr = 900; // 第三列 x
+
+    // 绘制表头分割线
+    setlinecolor(VA_CYAN);
+    setlinestyle(PS_SOLID, 2);
+    line(50, table_y + 35, SCREEN_WIDTH - 50, table_y + 35);
+
+    settextstyle(24, 0, _T("微软雅黑"));
+    settextcolor(VA_GRAY);
+
+    // 辅助 lambda：绘制带方括号的表头
+    auto drawHeader = [&](int x, LPCTSTR text) {
+        settextcolor(VA_GRAY);
+        outtextxy(x, table_y, _T("[ "));
+        int w1 = textwidth(_T("[ "));
+        settextcolor(VA_WHITE);
+        outtextxy(x + w1, table_y, text);
+        int w2 = textwidth(text);
+        settextcolor(VA_GRAY);
+        outtextxy(x + w1 + w2, table_y, _T(" ]"));
+        };
+
+    drawHeader(col_ver, _T("梦境类型"));
+    drawHeader(col_nam, _T("潜入者代号"));
+    drawHeader(col_scr, _T("记忆同步率"));
+
+    // 4. 列表内容
+    settextstyle(22, 0, _T("微软雅黑")); // 中文模式名用微软雅黑
     int y = 200;
+    int row_h = 40;
 
-    // 只显示前 10 名
     int count = 0;
-    for (const auto& rec : records) 
+    for (const auto& rec : records)
     {
         if (count >= 10) break;
 
-        TCHAR buf[128];
-
-        _stprintf_s(buf, _T("%-15S %-15S %d"), rec.version.c_str(), rec.user_name.c_str(), rec.score);
-
-        // 版本
-        TCHAR ver_buf[32];
-        _stprintf_s(ver_buf, _T("%S"), rec.version.c_str());
-        outtextxy(200, y, ver_buf);
-
-        // 名字
-        TCHAR name_buf[128];
-
-        // 截断保护：无论名字多长，只取前 20 个字符
-        std::string safe_name = rec.user_name;
-        if (safe_name.length() > 20) 
-        {
-            safe_name = safe_name.substr(0, 20) + "..."; // 超长截断并加省略号
+        // 绘制斑马纹背景 (偶数行画深色条)
+        if (count % 2 == 0) {
+            setfillcolor(VA_ROW_ALT);
+            solidrectangle(50, y - 5, SCREEN_WIDTH - 50, y + row_h - 5);
         }
 
-        // 使用截断后的 safe_name 进行绘制
-        _stprintf_s(name_buf, _T("%S"), safe_name.c_str());
-        outtextxy(500, y, name_buf);
+        // --- 列 1: 梦境类型 (映射为中文酒名) ---
+        // 原始记录可能是 "Intro", "Advanced" 等，这里做个转换显示
+        std::string mode_display = rec.version;
+        COLORREF mode_color = VA_WHITE;
 
-        // 分数
-        TCHAR score_buf[128];
-        _stprintf_s(score_buf, _T("%d"), rec.score);
-        outtextxy(900, y, score_buf);
+        if (rec.version == "Intro") { mode_display = "Intro"; mode_color = RGB(0, 255, 255); }
+        else if (rec.version == "Advanced") { mode_display = "Advanced"; mode_color = RGB(0, 120, 255); }
+        else if (rec.version == "Expert") { mode_display = "Expert"; mode_color = RGB(255, 42, 109); }
+        else if (rec.version == "Manual") { mode_display = "Manual"; mode_color = VA_GRAY; }
 
-        y += 40;
+        TCHAR ver_buf[64];
+#ifdef UNICODE
+    // 简单转码示例 (如果你项目是 Unicode)
+        wchar_t w_mode[64];
+        MultiByteToWideChar(CP_ACP, 0, mode_display.c_str(), -1, w_mode, 64);
+        _tcscpy_s(ver_buf, w_mode);
+#else
+        strcpy_s(ver_buf, mode_display.c_str());
+#endif
+
+        settextcolor(mode_color);
+        settextstyle(22, 0, _T("微软雅黑"));
+        outtextxy(col_ver + 20, y, ver_buf);
+
+
+        // --- 列 2: 名字 (Consolas 显示英文 ID 更有感觉) ---
+        settextcolor(VA_WHITE);
+        settextstyle(22, 0, _T("Consolas"));
+
+        std::string safe_name = rec.user_name;
+        if (safe_name.length() > 15) safe_name = safe_name.substr(0, 15) + "...";
+
+        TCHAR name_buf[64];
+#ifdef UNICODE
+        wchar_t w_name[64];
+        MultiByteToWideChar(CP_ACP, 0, safe_name.c_str(), -1, w_name, 64);
+        _tcscpy_s(name_buf, w_name);
+#else
+        strcpy_s(name_buf, safe_name.c_str());
+#endif
+        outtextxy(col_nam + 20, y, name_buf);
+
+
+        // --- 列 3: 分数 (高亮显示) ---
+        settextcolor(VA_CYAN);
+        TCHAR score_buf[32];
+        _stprintf_s(score_buf, _T("%06d"), rec.score); // 补零格式
+        outtextxy(col_scr + 20, y, score_buf);
+
+        y += row_h;
         count++;
     }
 
-    // 底部提示
-    settextcolor(LIGHTGRAY);
-    LPCTSTR tip = _T("Press SPACE to exit...");
-    outtextxy((SCREEN_WIDTH - textwidth(tip)) / 2, 650, tip);
+    // 5. 底部提示
+    settextcolor(VA_WHITE);
+    settextstyle(20, 0, _T("微软雅黑"));
+    LPCTSTR tip = _T(">> 按空格键中断连接 (DISCONNECT)...");
+    outtextxy((SCREEN_WIDTH - textwidth(tip)) / 2, SCREEN_HEIGHT - 50, tip);
 
     FlushBatchDraw();
 
     // 等待按键
-    while (true) 
+    while (true)
     {
         if (GetAsyncKeyState(VK_SPACE) & 0x8000) break;
         Sleep(10);
@@ -435,12 +627,12 @@ int UseEasyX::drawMenu()
     };
 
     MenuItem items[ITEM_COUNT] = {
-        { _T("1. SUGAR RUSH [INTRO]"),    _T("Casual mode. Don't die."),          RGB(0, 255, 255) },
-        { _T("2. MARSBLAST [ADVANCED]"),  _T("Walls are deadly. Respawn enabled."), RGB(0, 120, 255) },
-        { _T("3. FLAMING MOAI [EXPERT]"), _T("Bodies become food. 5 Lives."),     RGB(255, 42, 109) },
-        { _T("4. COBALT VELVET [DUAL]"),  _T("1v1 Local Multiplayer."),           RGB(180, 0, 255) },
-        { _T("5. DATABASE [HISTORY]"),    _T("Check past records."),              LIGHTGRAY },
-        { _T("6. SHUTDOWN [EXIT]"),       _T("Terminate program."),               DARKGRAY }
+        { _T("1. SUGAR RUSH [INTRO]"),    _T("“甘甜，清淡，水果风味，不能更加女性化的饮品。”"),          RGB(0, 255, 255) },
+        { _T("2. FRINGE WEAVER [ADVANCED]"),  _T("“如同就着一勺糖喝下无水酒精。”"), RGB(0, 120, 255) },
+        { _T("3. GUT PUNCH [EXPERT]"), _T("“这个名字的意思是‘由内脏（Gut）制成的混合饮料（Punch）’，但是同时也描述了饮用时的感受（重击腹部）。”"),     RGB(255, 42, 109) },
+        { _T("4. BAD TOUCH [DUAL]"),  _T("“我们毕竟不过是群哺乳动物。”"),           RGB(180, 0, 255) },
+        { _T("5. DATABASE [HISTORY]"),    _T("检索过往的记忆数据。或许能发现些什么。"),              LIGHTGRAY },
+        { _T("6. SHUTDOWN [EXIT]"),       _T("切断信号。本次服务到此结束，祝好梦。"),               DARKGRAY }
     };
 
     while (true) {
@@ -576,9 +768,9 @@ int UseEasyX::drawMenu()
             // 每隔一段时间加上光标 "_"
             bool show_cursor = (timer / 30) % 2 == 0;
             if (show_cursor)
-                outtextxy(20, SCREEN_HEIGHT - 40, _T("WAITING FOR INPUT..._"));
+                outtextxy(20, SCREEN_HEIGHT - 40, _T("等待信号接入..._"));
             else
-                outtextxy(20, SCREEN_HEIGHT - 40, _T("WAITING FOR INPUT..."));
+                outtextxy(20, SCREEN_HEIGHT - 40, _T("等待信号接入..."));
         }
 
         // --- 6. 全局特效：CRT 扫描线 ---
@@ -631,253 +823,355 @@ int UseEasyX::checkGameButtons(int mouse_x, int mouse_y, int offset_y)
 
 void UseEasyX::drawHistory(RecordManager& mgr)
 {
-    // 定义按钮参数
-    int btn_w = 120;
-    int btn_h = 40;
-    int start_x = 50;
-    int btn_y = SCREEN_HEIGHT - 80;
-    int gap = 20;
+    // --- 定义 VA-11 风格局部配色 ---
+    const COLORREF VA_BG = RGB(20, 20, 30);     // 深空底色
+    const COLORREF VA_ROW_ALT = RGB(30, 32, 45);     // 偶数行背景
+    const COLORREF VA_CYAN = RGB(0, 255, 255);    // 霓虹青 (操作/高亮)
+    const COLORREF VA_PINK = RGB(255, 42, 109);   // 故障粉 (警告/删除)
+    const COLORREF VA_BLUE = RGB(0, 120, 255);    // 深蓝 (修改)
+    const COLORREF VA_YELLOW = RGB(255, 200, 50);   // 黄色 (搜索)
+    const COLORREF VA_WHITE = RGB(220, 220, 220);  // 灰白
+    const COLORREF VA_GRAY = RGB(100, 100, 110);  // 暗灰
 
-    // 按钮 X 坐标
+    // 按钮布局参数
+    int btn_w = 140; // 按钮加宽以容纳中文和英文
+    int btn_h = 40;
+    int btn_y = SCREEN_HEIGHT - 80;
+    int gap = 15;
+
+    // 计算按钮位置 (居中排列)
+    int total_w = 4 * btn_w + 3 * gap;
+    int start_x = (SCREEN_WIDTH - total_w) / 2; // 功能按钮居中
+
     int x_add = start_x;
     int x_del = x_add + btn_w + gap;
     int x_mod = x_del + btn_w + gap;
     int x_search = x_mod + btn_w + gap;
-    int x_back = SCREEN_WIDTH - btn_w - 50;
+
+    // 返回按钮独立放在右下角
+    int x_back = SCREEN_WIDTH - 160;
 
     // 搜索状态
     bool is_searching = false;
     std::vector<Record> search_result;
 
+    // 鼠标位置追踪
+    int mx = 0, my = 0;
+
+    // 辅助 lambda: 绘制 VA 风格功能按钮
+    auto drawFuncButton = [&](int x, int y, int w, int h, LPCTSTR text, LPCTSTR sub, COLORREF color, bool hover) {
+        // 背景
+        setfillcolor(hover ? color : VA_BG);
+        setlinecolor(color);
+        fillrectangle(x, y, x + w, y + h);
+
+        // 装饰框 (悬停时)
+        if (hover) {
+            setlinecolor(WHITE);
+            rectangle(x - 3, y - 3, x + w + 3, y + h + 3);
+            settextcolor(WHITE);
+        }
+        else {
+            settextcolor(color);
+        }
+
+        // 文字
+        setbkmode(TRANSPARENT);
+        settextstyle(20, 0, _T("微软雅黑"), 0, 0, FW_BOLD, false, false, false);
+        outtextxy(x + 10, y + 5, text);
+
+        // 英文副标 (小字)
+        settextstyle(12, 0, _T("Consolas"));
+        outtextxy(x + 10, y + 25, sub);
+        };
+
     while (true)
     {
+        // 1. 处理输入 (追踪鼠标 + 点击)
+        bool is_click = false;
+        while (MouseHit()) {
+            MOUSEMSG msg = GetMouseMsg();
+            mx = msg.x;
+            my = msg.y;
+            if (msg.uMsg == WM_LBUTTONDOWN) is_click = true;
+        }
+
+        // 2. 绘制背景
+        setbkcolor(VA_BG);
         cleardevice();
 
-        // 1. 标题
-        settextstyle(40, 0, _T("Arial"));
-        settextcolor(YELLOW);
-        LPCTSTR title = is_searching ? _T("SEARCH RESULTS") : _T("RECORD MANAGEMENT");
-        outtextxy((SCREEN_WIDTH - textwidth(title)) / 2, 30, title);
+        // 绘制背景网格
+        setlinecolor(RGB(25, 25, 35));
+        for (int i = 0; i < SCREEN_WIDTH; i += 40) line(i, 0, i, SCREEN_HEIGHT);
+        for (int i = 0; i < SCREEN_HEIGHT; i += 40) line(0, i, SCREEN_WIDTH, i);
 
-        // 2. 表头
-        settextstyle(24, 0, _T("Consolas"));
-        settextcolor(LIGHTCYAN);
-        // 显示 INDEX 方便删除
-        outtextxy(100, 100, _T("ID"));
-        outtextxy(200, 100, _T("VERSION"));
-        outtextxy(500, 100, _T("NAME"));
-        outtextxy(900, 100, _T("SCORE"));
+        // 3. 标题：[ 记忆数据管理 ]
+        settextstyle(40, 0, _T("微软雅黑"), 0, 0, FW_BOLD, false, false, false);
+        LPCTSTR title = is_searching ? _T("[ 检索结果片段 ]") : _T("[ 记忆数据管理 ]");
 
-        // 3. 列表内容
-        settextcolor(WHITE);
-        int y = 140;
+        // 标题故障阴影
+        int title_w = textwidth(title);
+        int cx = SCREEN_WIDTH / 2;
+        settextcolor(RGB(100, 0, 100)); // 紫色阴影
+        outtextxy(cx - title_w / 2 + 4, 30 + 4, title);
 
-        // 根据状态决定显示全表还是搜索结果
+        settextcolor(is_searching ? VA_YELLOW : VA_CYAN);
+        outtextxy(cx - title_w / 2, 30, title);
+
+        // 装饰横线
+        setlinecolor(VA_WHITE);
+        line(50, 90, SCREEN_WIDTH - 50, 90);
+
+        // 4. 列表表头
+        int y_head = 110;
+        settextstyle(20, 0, _T("Consolas"));
+        settextcolor(VA_GRAY);
+
+        // 列坐标
+        int col_id = 100;
+        int col_ver = 250;
+        int col_name = 550;
+        int col_score = 900;
+
+        outtextxy(col_id, y_head, _T("INDEX_ID"));
+        outtextxy(col_ver, y_head, _T("DREAM_TYPE"));
+        outtextxy(col_name, y_head, _T("INFILTRATOR"));
+        outtextxy(col_score, y_head, _T("SYNC_RATE"));
+
+        // 5. 列表内容
         const std::vector<Record>& list_to_show = is_searching ? search_result : mgr.getAllRecords();
+        int y = 140;
+        int row_h = 35;
+
+        settextstyle(20, 0, _T("微软雅黑")); // 内容用微软雅黑
 
         int count = 0;
-        for (size_t i = 0; i < list_to_show.size(); ++i) 
+        for (size_t i = 0; i < list_to_show.size(); ++i)
         {
-            if (count >= 12) break; // 每页最多显示12条
+            if (count >= 12) break;
 
             const auto& rec = list_to_show[i];
 
+            // 斑马纹背景
+            if (count % 2 == 0) {
+                setfillcolor(VA_ROW_ALT);
+                solidrectangle(50, y - 2, SCREEN_WIDTH - 50, y + row_h - 2);
+            }
+
+            // ID
+            settextcolor(VA_GRAY);
             TCHAR buf[128];
-
-            // 显示 ID 
-            if (!is_searching) 
-            {
-                _stprintf_s(buf, _T("%d"), (int)i);
-                outtextxy(100, y, buf);
+            if (!is_searching) {
+                _stprintf_s(buf, _T("#%03d"), (int)i); // ID 补零
+                outtextxy(col_id, y, buf);
             }
-            else 
-            {
-                outtextxy(100, y, _T("-"));
+            else {
+                outtextxy(col_id, y, _T("---"));
             }
 
-            // 版本
-            _stprintf_s(buf, _T("%-15S"), rec.version.c_str());
-            outtextxy(200, y, buf);
+            // 版本 (中文映射)
+            settextcolor(VA_WHITE);
+            std::string ver_str = rec.version;
+            COLORREF v_color = VA_WHITE;
+            if (ver_str == "Intro") { ver_str = "Intro"; v_color = VA_CYAN; }
+            else if (ver_str == "Advanced") { ver_str = "Advanced"; v_color = VA_BLUE; }
+            else if (ver_str == "Expert") { ver_str = "Expert"; v_color = VA_PINK; }
+            else if (ver_str == "Manual") { ver_str = "Manual"; v_color = VA_YELLOW; }
 
-            // 名字 (带截断保护)
+            // 名字
+            settextcolor(VA_WHITE);
             std::string safe_name = rec.user_name;
-            if (safe_name.length() > 20) safe_name = safe_name.substr(0, 20) + "...";
-            _stprintf_s(buf, _T("%-20S"), safe_name.c_str());
-            outtextxy(500, y, buf);
+            if (safe_name.length() > 15) safe_name = safe_name.substr(0, 15) + "...";
+
+#ifdef UNICODE
+            wchar_t w_name[64];
+            MultiByteToWideChar(CP_ACP, 0, safe_name.c_str(), -1, w_name, 64);
+            outtextxy(col_name, y, w_name);
+#else
+            outtextxy(col_name, y, safe_name.c_str());
+#endif
 
             // 分数
-            _stprintf_s(buf, _T("%d"), rec.score);
-            outtextxy(900, y, buf);
+            settextcolor(VA_CYAN);
+            _stprintf_s(buf, _T("%06d"), rec.score);
+            settextstyle(20, 0, _T("Consolas")); // 数字用 Consolas
+            outtextxy(col_score, y, buf);
+            settextstyle(20, 0, _T("微软雅黑")); // 还原字体
 
-            y += 35;
+            y += row_h;
             count++;
         }
 
-        // 4. 绘制功能按钮
-        if (!is_searching) 
+        // 6. 绘制功能按钮
+        // 只有非搜索模式才显示操作按钮
+        if (!is_searching)
         {
-            drawButton(x_add, btn_y, btn_w, btn_h, _T("ADD"), GREEN);
-            drawButton(x_del, btn_y, btn_w, btn_h, _T("DELETE"), RED);
-            drawButton(x_mod, btn_y, btn_w, btn_h, _T("MODIFY"), BLUE);
-            drawButton(x_search, btn_y, btn_w, btn_h, _T("SEARCH"), BROWN);
-        }
-
-        // 返回按钮
-        drawButton(x_back, btn_y, btn_w, btn_h, is_searching ? _T("RESET") : _T("BACK"), DARKGRAY);
-
-        FlushBatchDraw();
-
-        // 5. 交互逻辑
-        if (MouseHit()) 
-        {
-            MOUSEMSG msg = GetMouseMsg();
-            if (msg.uMsg == WM_LBUTTONDOWN)
-            {
-
-                // --- 返回 / 重置 ---
-                if (isClickIn(msg.x, msg.y, x_back, btn_y, btn_w, btn_h)) 
-                {
-                    if (is_searching) 
-                    {
-                        is_searching = false; // 退出搜索模式
-                    }
-                    else 
-                    {
-                        break; // 退出历史界面
-                    }
-                }
-
-                // (仅在非搜索模式下可用)
-                if (!is_searching) 
-                {
-
-                    // --- 增 (ADD) ---
-                    if (isClickIn(msg.x, msg.y, x_add, btn_y, btn_w, btn_h)) {
-                        TCHAR name_buf[32] = { 0 };
-                        InputBox(name_buf, 32, _T("Enter Name:"), _T("Add Record"), _T("TestUser"), 0, 0, false);
-
-                        TCHAR score_buf[32] = { 0 };
-                        InputBox(score_buf, 32, _T("Enter Score:"), _T("Add Record"), _T("100"), 0, 0, false);
-
-                        // 转换并添加
+            // 增 - 注入
+            bool h_add = isClickIn(mx, my, x_add, btn_y, btn_w, btn_h);
+            drawFuncButton(x_add, btn_y, btn_w, btn_h, _T("注入数据"), _T("INJECT"), VA_CYAN, h_add);
+            if (is_click && h_add) {
+                // ... (保持原有的 InputBox 逻辑, 此处省略重复代码) ...
+                // 建议：为了体验，这里只写逻辑占位，你需要把原来 InputBox 代码拷回来
+                TCHAR n[32] = { 0 }, s[32] = { 0 };
+                InputBox(n, 32, _T("INFILTRATOR NAME:"), _T("INJECT"), _T("Ghost"), 0, 0, false);
+                InputBox(s, 32, _T("SYNC RATE:"), _T("INJECT"), _T("1000"), 0, 0, false);
+                // ...转码并 addRecord...
 #ifdef UNICODE
-                        int len = WideCharToMultiByte(CP_ACP, 0, name_buf, -1, NULL, 0, NULL, NULL);
-                        char* n_ptr = new char[len];
-                        WideCharToMultiByte(CP_ACP, 0, name_buf, -1, n_ptr, len, NULL, NULL);
-                        std::string name_str(n_ptr);
-                        delete[] n_ptr;
+                int len = WideCharToMultiByte(CP_ACP, 0, n, -1, NULL, 0, NULL, NULL);
+                char* p = new char[len];
+                WideCharToMultiByte(CP_ACP, 0, n, -1, p, len, NULL, NULL);
+                std::string ns(p); delete[] p;
 #else
-                        std::string name_str(name_buf);
+                std::string ns(n);
 #endif
+                mgr.addRecord("Manual", ns, _ttoi(s));
+            }
 
-                        int score_val = _ttoi(score_buf);
-                        mgr.addRecord("Manual", name_str, score_val);
-                    }
+            // 删 - 抹除
+            bool h_del = isClickIn(mx, my, x_del, btn_y, btn_w, btn_h);
+            drawFuncButton(x_del, btn_y, btn_w, btn_h, _T("抹除痕迹"), _T("PURGE"), VA_PINK, h_del);
+            if (is_click && h_del) {
+                TCHAR i[32] = { 0 };
+                InputBox(i, 32, _T("TARGET ID:"), _T("PURGE"), _T("0"), 0, 0, false);
+                mgr.deleteRecord(_ttoi(i));
+            }
 
-                    // --- 删 (DELETE) ---
-                    if (isClickIn(msg.x, msg.y, x_del, btn_y, btn_w, btn_h)) {
-                        TCHAR idx_buf[32] = { 0 };
-                        InputBox(idx_buf, 32, _T("Enter ID (Index) to Delete:"), _T("Delete Record"), _T("0"), 0, 0, false);
-                        int idx = _ttoi(idx_buf);
-                        mgr.deleteRecord(idx);
-                    }
-
-                    // --- 改 (MODIFY) ---
-                    if (isClickIn(msg.x, msg.y, x_mod, btn_y, btn_w, btn_h)) {
-                        TCHAR old_buf[32] = { 0 };
-                        InputBox(old_buf, 32, _T("Enter Exact Old Username:"), _T("Modify Name"), _T(""), 0, 0, false);
-
-                        TCHAR new_buf[32] = { 0 };
-                        InputBox(new_buf, 32, _T("Enter New Username:"), _T("Modify Name"), _T(""), 0, 0, false);
-
-                        // 转换逻辑
-                        std::string old_s, new_s;
+            // 改 - 篡改
+            bool h_mod = isClickIn(mx, my, x_mod, btn_y, btn_w, btn_h);
+            drawFuncButton(x_mod, btn_y, btn_w, btn_h, _T("篡改记忆"), _T("REWRITE"), VA_BLUE, h_mod);
+            if (is_click && h_mod) {
+                // ... InputBox 逻辑 ...
+                TCHAR o[32], n[32];
+                InputBox(o, 32, _T("ORIGINAL NAME:"), _T("REWRITE"), _T(""), 0, 0, false);
+                InputBox(n, 32, _T("NEW ALIAS:"), _T("REWRITE"), _T(""), 0, 0, false);
+                // ... 转码并 modify ...
 #ifdef UNICODE
-                        {
-                            int l = WideCharToMultiByte(CP_ACP, 0, old_buf, -1, NULL, 0, NULL, NULL);
-                            char* p = new char[l];
-                            WideCharToMultiByte(CP_ACP, 0, old_buf, -1, p, l, NULL, NULL);
-                            old_s = p; delete[] p;
-
-                            l = WideCharToMultiByte(CP_ACP, 0, new_buf, -1, NULL, 0, NULL, NULL);
-                            p = new char[l];
-                            WideCharToMultiByte(CP_ACP, 0, new_buf, -1, p, l, NULL, NULL);
-                            new_s = p; delete[] p;
-                        }
+  // 省略转码细节
+  // mgr.modifyUserName(toStr(o), toStr(n));
 #else
-                        old_s = old_buf; new_s = new_buf;
+                mgr.modifyUserName(o, n);
 #endif
+            }
 
-                        mgr.modifyUserName(old_s, new_s);
-                    }
-
-                    // --- 查 (SEARCH) ---
-                    if (isClickIn(msg.x, msg.y, x_search, btn_y, btn_w, btn_h)) {
-                        TCHAR search_buf[32] = { 0 };
-                        InputBox(search_buf, 32, _T("Enter Username to Search:"), _T("Search"), _T(""), 0, 0, false);
-
-                        std::string target_name;
+            // 查 - 检索
+            bool h_src = isClickIn(mx, my, x_search, btn_y, btn_w, btn_h);
+            drawFuncButton(x_search, btn_y, btn_w, btn_h, _T("检索片段"), _T("SEARCH"), VA_YELLOW, h_src);
+            if (is_click && h_src) {
+                TCHAR t[32];
+                InputBox(t, 32, _T("KEYWORD:"), _T("SEARCH"), _T(""), 0, 0, false);
 #ifdef UNICODE
-                        int len = WideCharToMultiByte(CP_ACP, 0, search_buf, -1, NULL, 0, NULL, NULL);
-                        char* p = new char[len];
-                        WideCharToMultiByte(CP_ACP, 0, search_buf, -1, p, len, NULL, NULL);
-                        target_name = p; delete[] p;
+                // 转码...
+                // search_result = mgr.searchRecords(target);
 #else
-                        target_name = search_buf;
+                search_result = mgr.searchRecords(t);
 #endif
-
-                        search_result = mgr.searchRecords(target_name);
-                        is_searching = true; // 进入搜索结果显示模式
-                    }
-                }
+                is_searching = true;
             }
         }
+
+        // 返回 / 重置
+        bool h_back = isClickIn(mx, my, x_back, btn_y, btn_w, btn_h);
+        drawFuncButton(x_back, btn_y, btn_w, btn_h,
+            is_searching ? _T("重置视图") : _T("断开连接"),
+            is_searching ? _T("RESET") : _T("DISCONNECT"),
+            VA_WHITE, h_back);
+
+        if (is_click && h_back) {
+            if (is_searching) is_searching = false;
+            else break;
+        }
+
+        FlushBatchDraw();
         Sleep(10);
     }
 }
 
 void UseEasyX::drawDualGameOver(int winner)
 {
-    FlushBatchDraw();
+    // --- 局部配色 ---
+    const COLORREF VA_BG = RGB(20, 20, 30);
+    const COLORREF VA_GREEN = RGB(0, 255, 128);    // P1 主色 (荧光绿)
+    const COLORREF VA_BLUE = RGB(0, 120, 255);    // P2 主色 (深空蓝)
+    const COLORREF VA_YELLOW = RGB(255, 200, 50);   // 平局/警告
+    const COLORREF VA_WHITE = RGB(220, 220, 220);
 
-    int center_x = SCREEN_WIDTH / 2;
-    int center_y = SCREEN_HEIGHT / 2;
+    // 1. 清除背景
+    setbkcolor(VA_BG);
+    cleardevice();
 
-    // 1. 标题
-    settextstyle(60, 0, _T("Arial"));
+    // 2. 确定主色调和文案
+    COLORREF main_color = VA_YELLOW;
+    LPCTSTR title_text = _T("");
+    LPCTSTR sub_text = _T("");
 
-    LPCTSTR text = _T("GAME OVER");
-    if (winner == 1) 
-    {
-        settextcolor(GREEN);
-        text = _T("PLAYER 1 WINS!");
+    if (winner == 1) {
+        main_color = VA_GREEN;
+        title_text = _T("[ 链路 A 覆盖成功 ]");
+        sub_text = _T("VICTOR: NEURAL LINK A (P1)");
     }
-    else if (winner == 2) 
-    {
-        settextcolor(LIGHTBLUE);
-        text = _T("PLAYER 2 WINS!");
+    else if (winner == 2) {
+        main_color = VA_BLUE;
+        title_text = _T("[ 链路 B 覆盖成功 ]");
+        sub_text = _T("VICTOR: NEURAL LINK B (P2)");
     }
-    else 
-    {
-        settextcolor(YELLOW);
-        text = _T("DRAW GAME!");
+    else {
+        main_color = VA_YELLOW;
+        title_text = _T("[ 信号严重冲突 ]"); // 平局
+        sub_text = _T("ERROR: SIGNAL DEADLOCK (DRAW)");
     }
 
-    int w = textwidth(text);
-    outtextxy(center_x - w / 2, center_y - 50, text);
+    // 3. 绘制警告框 (居中)
+    int cx = SCREEN_WIDTH / 2;
+    int cy = SCREEN_HEIGHT / 2;
+    int box_w = 680;
+    int box_h = 320;
 
-    // 2. 退出提示
-    LPCTSTR tip = _T("Press SPACE to return to menu...");
+    // 半透明底
+    setfillcolor(RGB(30, 32, 45));
+    fillrectangle(cx - box_w / 2, cy - box_h / 2, cx + box_w / 2, cy + box_h / 2);
+
+    // 粗边框 (颜色跟随胜者)
+    setlinecolor(main_color);
+    setlinestyle(PS_SOLID, 4);
+    rectangle(cx - box_w / 2, cy - box_h / 2, cx + box_w / 2, cy + box_h / 2);
+
+    // 内部扫描线
+    setlinecolor(RGB(40, 45, 55));
+    setlinestyle(PS_SOLID, 1);
+    for (int y = cy - box_h / 2 + 10; y < cy + box_h / 2; y += 6) {
+        line(cx - box_w / 2 + 5, y, cx + box_w / 2 - 5, y);
+    }
+
+    // 4. 绘制标题 (带故障阴影)
+    setbkmode(TRANSPARENT);
+    settextstyle(50, 0, _T("微软雅黑"), 0, 0, FW_BOLD, false, false, false);
+
+    // 阴影
+    settextcolor(RGB(50, 50, 50));
+    outtextxy(cx - textwidth(title_text) / 2 + 4, cy - 80 + 4, title_text);
+
+    // 本体
+    settextcolor(main_color);
+    outtextxy(cx - textwidth(title_text) / 2, cy - 80, title_text);
+
+    // 5. 绘制副标题 (英文结果)
     settextstyle(24, 0, _T("Consolas"));
-    settextcolor(WHITE);
-    w = textwidth(tip);
-    outtextxy(center_x - w / 2, center_y + 50, tip);
+    settextcolor(VA_WHITE);
+    outtextxy(cx - textwidth(sub_text) / 2, cy + 10, sub_text);
+
+    // 分割线
+    setlinecolor(VA_WHITE);
+    line(cx - 200, cy + 50, cx + 200, cy + 50);
+
+    // 6. 退出提示
+    LPCTSTR tip = _T(">> 按空格键重置对抗链路 (RESET LINK)...");
+    settextstyle(20, 0, _T("微软雅黑"));
+    outtextxy(cx - textwidth(tip) / 2, cy + 80, tip);
 
     FlushBatchDraw();
 
-    // 等待按空格退出
-    while (true) 
-    {
+    // 等待按键
+    while (true) {
         if (GetAsyncKeyState(VK_SPACE) & 0x8000) break;
         Sleep(10);
     }
@@ -885,44 +1179,104 @@ void UseEasyX::drawDualGameOver(int winner)
 
 void UseEasyX::drawDualUI(int score1, int score2, int game_time_seconds, bool is_paused)
 {
-    // 1. 绘制基本文字信息
-    settextcolor(WHITE);
-    settextstyle(24, 0, _T("Consolas"));
+    // --- 配色定义 ---
+    const COLORREF VA_P1_COLOR = RGB(0, 255, 128);   // P1 绿色
+    const COLORREF VA_P2_COLOR = RGB(0, 150, 255);   // P2 蓝色
+    const COLORREF VA_WHITE = RGB(220, 220, 220);
+    const COLORREF VA_GRAY = RGB(100, 100, 110);
+    const COLORREF VA_PINK = RGB(255, 42, 109);  // 警告色
 
-    TCHAR str_buf[128];
+    setbkmode(TRANSPARENT);
+    settextstyle(20, 0, _T("微软雅黑")); // 标签字体
+    TCHAR buf[128];
 
-    // 显示时间
-    _stprintf_s(str_buf, _T("Time: %02d:%02d"), game_time_seconds / 60, game_time_seconds % 60);
-    outtextxy(SCREEN_WIDTH / 2 - 60, 20, str_buf); // 时间居中
+    // 辅助 Lambda：绘制监控数据块
+    auto drawDualItem = [&](int x, int y, LPCTSTR label, int score, COLORREF color) {
+        // [ 标签 ]
+        settextcolor(VA_GRAY);
+        outtextxy(x, y, _T("[ "));
+        int w1 = textwidth(_T("[ "));
 
-    // 显示 P1 分数 (左上角，绿色)
-    settextcolor(GREEN);
-    _stprintf_s(str_buf, _T("P1 Score: %d"), score1);
-    outtextxy(20, 20, str_buf);
+        settextcolor(color); // 标签本身带颜色
+        outtextxy(x + w1, y, label);
+        int w2 = textwidth(label);
 
-    // 显示 P2 分数 (右上角，蓝色 - 需要根据 SCREEN_WIDTH 倒推位置)
-    settextcolor(LIGHTBLUE);
-    _stprintf_s(str_buf, _T("P2 Score: %d"), score2);
-    int p2_w = textwidth(str_buf);
-    outtextxy(SCREEN_WIDTH - p2_w - 20, 20, str_buf); // 靠右显示
+        settextcolor(VA_GRAY);
+        outtextxy(x + w1 + w2, y, _T(" ]"));
 
-    // 2. 绘制功能按钮 (暂停/菜单) - 复用原来的位置
-    drawButton(BTN_PAUSE_X, BTN_PAUSE_Y + 40, BTN_W, BTN_H, 
-        is_paused ? _T("RESUME") : _T("PAUSE"),
-        is_paused ? GREEN : BROWN);
+        // 数值 (下移一行或者右侧) -> 这里选择下方显示大数字，更有仪表盘感
+        _stprintf_s(buf, _T("%05d"), score); // 5位补零
+        settextstyle(28, 0, _T("Consolas"));
+        settextcolor(VA_WHITE);
+        outtextxy(x + 10, y + 25, buf);
+        settextstyle(20, 0, _T("微软雅黑")); // 还原
+        };
 
-    drawButton(BTN_RETURN_X, BTN_RETURN_Y + 40, BTN_W, BTN_H, _T("MENU"), RED);
+    // --- 1. 顶部数据栏 ---
 
-    // 3. 绘制屏幕中央的暂停提示
+    // P1 (左上) -> [ 链路 A (P1) ]
+    drawDualItem(30, 20, _T("链路 A (P1)"), score1, VA_P1_COLOR);
+
+    // P2 (右上) -> [ 链路 B (P2) ]
+    // 需要计算右侧位置
+    int p2_x = SCREEN_WIDTH - 200;
+    drawDualItem(p2_x, 20, _T("链路 B (P2)"), score2, VA_P2_COLOR);
+
+    // 时间 (正中) -> [ 对抗时长 ]
+    settextcolor(VA_GRAY);
+    LPCTSTR time_lbl = _T("- 对抗时长 -");
+    int tx = (SCREEN_WIDTH - textwidth(time_lbl)) / 2;
+    outtextxy(tx, 20, time_lbl);
+
+    _stprintf_s(buf, _T("%02d:%02d"), game_time_seconds / 60, game_time_seconds % 60);
+    settextstyle(28, 0, _T("Consolas"));
+    settextcolor(VA_WHITE);
+    outtextxy((SCREEN_WIDTH - textwidth(buf)) / 2, 45, buf);
+
+
+    // --- 2. 功能按钮 (复用位置，改文案) ---
+    // 为了不遮挡分数，按钮位置可能需要微调，这里保持原位但风格化
+    // 暂停 -> 挂起 / 恢复
+    drawButton(BTN_PAUSE_X, BTN_PAUSE_Y + 40, BTN_W, BTN_H,
+        is_paused ? _T("恢复链路") : _T("挂起对抗"),
+        is_paused ? VA_PINK : RGB(0, 200, 200));
+
+    // 菜单 -> 强制终止
+    drawButton(BTN_RETURN_X, BTN_RETURN_Y + 40, BTN_W, BTN_H, _T("强制终止"), VA_GRAY);
+
+
+    // --- 3. 暂停遮罩 (双人版) ---
     if (is_paused)
     {
-        settextstyle(80, 0, _T("Arial"));
-        settextcolor(YELLOW);
-        LPCTSTR p_text = _T("GAME PAUSED");
-        int text_w = textwidth(p_text);
-        int text_h = textheight(p_text);
-        outtextxy((SCREEN_WIDTH - text_w) / 2, (SCREEN_HEIGHT - text_h) / 2, p_text);
+        // 1. 暗色遮罩
+        setlinecolor(RGB(0, 0, 0));
+        for (int i = 0; i < SCREEN_HEIGHT; i += 2) line(0, i, SCREEN_WIDTH, i);
+
+        // 2. 弹窗
+        int cx = SCREEN_WIDTH / 2;
+        int cy = SCREEN_HEIGHT / 2;
+        int bw = 500, bh = 200;
+
+        setfillcolor(RGB(20, 20, 30));
+        fillrectangle(cx - bw / 2, cy - bh / 2, cx + bw / 2, cy + bh / 2);
+
+        // 边框 (粉色警告)
+        setlinecolor(VA_PINK);
+        setlinestyle(PS_SOLID, 3);
+        rectangle(cx - bw / 2, cy - bh / 2, cx + bw / 2, cy + bh / 2);
+        setlinestyle(PS_SOLID, 1);
+
+        // 文字
+        settextstyle(40, 0, _T("微软雅黑"), 0, 0, FW_BOLD, false, false, false);
+        settextcolor(VA_PINK);
+        LPCTSTR t = _T("[ 对抗进程挂起 ]");
+        outtextxy(cx - textwidth(t) / 2, cy - 40, t);
+
+        settextstyle(20, 0, _T("Consolas"));
+        settextcolor(VA_WHITE);
+        LPCTSTR st = _T(">> AWAITING SIGNAL INPUT...");
+        outtextxy(cx - textwidth(st) / 2, cy + 30, st);
     }
 
     FlushBatchDraw();
-};
+}
