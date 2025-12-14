@@ -322,7 +322,6 @@ void UseEasyX::drawUI(int current_score, int high_score, int snake_len, int hp, 
     FlushBatchDraw();
 }
 
-
 void UseEasyX::drawGameOver(int final_score)
 {
     // VA-11 风格配色
@@ -983,6 +982,18 @@ void UseEasyX::drawHistory(RecordManager& mgr)
             std::string safe_name = rec.user_name;
             if (safe_name.length() > 15) safe_name = safe_name.substr(0, 15) + "...";
 
+            TCHAR ver_buf[64];
+#ifdef UNICODE
+            wchar_t w_ver[64];
+            MultiByteToWideChar(CP_ACP, 0, ver_str.c_str(), -1, w_ver, 64);
+            _tcscpy_s(ver_buf, w_ver);
+#else
+            strcpy_s(ver_buf, ver_str.c_str());
+#endif
+            settextcolor(v_color);
+            outtextxy(col_ver, y, ver_buf);
+
+
 #ifdef UNICODE
             wchar_t w_name[64];
             MultiByteToWideChar(CP_ACP, 0, safe_name.c_str(), -1, w_name, 64);
@@ -1010,8 +1021,6 @@ void UseEasyX::drawHistory(RecordManager& mgr)
             bool h_add = isClickIn(mx, my, x_add, btn_y, btn_w, btn_h);
             drawFuncButton(x_add, btn_y, btn_w, btn_h, _T("注入数据"), _T("INJECT"), VA_CYAN, h_add);
             if (is_click && h_add) {
-                // ... (保持原有的 InputBox 逻辑, 此处省略重复代码) ...
-                // 建议：为了体验，这里只写逻辑占位，你需要把原来 InputBox 代码拷回来
                 TCHAR n[32] = { 0 }, s[32] = { 0 };
                 InputBox(n, 32, _T("INFILTRATOR NAME:"), _T("INJECT"), _T("Ghost"), 0, 0, false);
                 InputBox(s, 32, _T("SYNC RATE:"), _T("INJECT"), _T("1000"), 0, 0, false);
@@ -1046,8 +1055,21 @@ void UseEasyX::drawHistory(RecordManager& mgr)
                 InputBox(n, 32, _T("NEW ALIAS:"), _T("REWRITE"), _T(""), 0, 0, false);
                 // ... 转码并 modify ...
 #ifdef UNICODE
-  // 省略转码细节
-  // mgr.modifyUserName(toStr(o), toStr(n));
+                // 转码旧名字 (TCHAR -> std::string)
+                int len_o = WideCharToMultiByte(CP_ACP, 0, o, -1, NULL, 0, NULL, NULL);
+                char* p_o = new char[len_o];
+                WideCharToMultiByte(CP_ACP, 0, o, -1, p_o, len_o, NULL, NULL);
+                std::string str_old(p_o);
+                delete[] p_o;
+
+                // 转码新名字
+                int len_n = WideCharToMultiByte(CP_ACP, 0, n, -1, NULL, 0, NULL, NULL);
+                char* p_n = new char[len_n];
+                WideCharToMultiByte(CP_ACP, 0, n, -1, p_n, len_n, NULL, NULL);
+                std::string str_new(p_n);
+                delete[] p_n;
+
+                mgr.modifyUserName(str_old, str_new);
 #else
                 mgr.modifyUserName(o, n);
 #endif
@@ -1060,8 +1082,14 @@ void UseEasyX::drawHistory(RecordManager& mgr)
                 TCHAR t[32];
                 InputBox(t, 32, _T("KEYWORD:"), _T("SEARCH"), _T(""), 0, 0, false);
 #ifdef UNICODE
-                // 转码...
-                // search_result = mgr.searchRecords(target);
+                // 转码搜索关键词 (TCHAR -> std::string)
+                int len = WideCharToMultiByte(CP_ACP, 0, t, -1, NULL, 0, NULL, NULL);
+                char* p = new char[len];
+                WideCharToMultiByte(CP_ACP, 0, t, -1, p, len, NULL, NULL);
+                std::string str_key(p);
+                delete[] p;
+
+                search_result = mgr.searchRecords(str_key);
 #else
                 search_result = mgr.searchRecords(t);
 #endif
