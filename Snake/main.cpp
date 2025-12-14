@@ -33,7 +33,7 @@ int main()
         case 2: game = new AdvancedGame(); break;
         case 3: game = new ExpertGame(); break;
             // 【新增】双人模式：P1(左侧,向右) vs P2(右侧,向左)
-        case 4: game = new DualGame(5, 9, Direction::RIGHT, MAP_WIDTH - 6, 9, Direction::LEFT); break;
+        case 4: game = new DualGame(8, 9, Direction::RIGHT, MAP_WIDTH - 9, 9, Direction::LEFT); break;
         }
 
         // 3. 运行

@@ -373,7 +373,7 @@ void ExpertGame::onSnakeDie()
 
 // --- DualGame (本地双人对战版) 实现 ---
 DualGame::DualGame(int x_1, int y_1, Direction d_1, int x_2, int y_2, Direction d_2):
-    GameBase(12,9,Direction::RIGHT),snake_2(20, 9, Direction::LEFT)
+    GameBase(x_1,y_1,d_1),snake_2(x_2, y_2, d_2)
 {
     score_2 = 0; // 【新增】记录 P2 的分数
     winner = 0; // 初始化为平局
