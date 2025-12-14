@@ -1,5 +1,14 @@
 #pragma once
 
+#include "easyx.h"
+
+#include <deque>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <ctime> 
+#include <random> 
+
 // 渲染参数（给 EasyX 用的）
 const int BLOCK_SIZE = 40;     // 每个格子 40x40 像素
 const int SCREEN_WIDTH = 1280; // 屏幕宽

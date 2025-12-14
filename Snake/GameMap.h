@@ -2,6 +2,13 @@
 
 #include "DataStructure.h"
 
+#include <deque>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <ctime> 
+#include <random> 
+
 class GameMap {
 private:
 	BlockType game_map[MAP_WIDTH][MAP_HEIGHT];//在1280x720分辨率下网格化坐标，每个格子20x20，网格化结果宽32，高18

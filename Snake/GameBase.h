@@ -6,7 +6,13 @@
 #include "UseEasyX.h"
 #include "RecordManager.h"
 #include "Food.h"
+
+#include <deque>
+#include <string>
+#include <vector>
+#include <algorithm>
 #include <ctime> 
+#include <random> 
 
 // ³éÏó»ùÀà
 class GameBase {

@@ -1,6 +1,12 @@
 #pragma once
+
 #include "DataStructure.h"
 #include <deque>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <ctime> 
+#include <random> 
 
 class Snake {
 private:

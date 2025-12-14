@@ -1,8 +1,11 @@
 #pragma once
-#include <vector>
-#include <string>
-#include <algorithm> // 用于排序和查找
 
+#include <deque>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <ctime> 
+#include <random> 
 // 定义单条记录结构体
 struct Record {
     std::string version;   // 游戏版本 

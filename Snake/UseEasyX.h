@@ -6,6 +6,9 @@
 #include <deque>
 #include <string>
 #include <vector>
+#include <algorithm>
+#include <ctime> 
+#include <random> 
 
 // --- VA-11 HALL-A 主题配色 ---
 // 背景色：深邃的午夜紫

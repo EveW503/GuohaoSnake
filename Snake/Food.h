@@ -1,8 +1,13 @@
 #pragma once
-#include <vector> /
+
 #include "DataStructure.h"
+
+#include <deque>
+#include <string>
+#include <vector>
+#include <algorithm>
+#include <ctime> 
 #include <random> 
-#include <ctime>  
 
 class GameMap;//ÏÈÉùÃ÷GameMap
 
