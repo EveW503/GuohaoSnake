@@ -9,6 +9,7 @@ private:
 
 public:
     Snake();
+    Snake(int x, int y, Direction d);
     ~Snake();
 
     // ºËĞÄÒÆ¶¯

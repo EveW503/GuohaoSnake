@@ -73,12 +73,12 @@ void UseEasyX::drawMap(GameMap& map)
     }
 }
 
-void UseEasyX::drawSnake(const std::deque<Point>& snake_body)
+void UseEasyX::drawSnake(const std::deque<Point>& snake_body, COLORREF body_color, COLORREF head_color)
 {
     if (snake_body.empty()) return;
 
     // 1. ª≠…ﬂ…Ì
-    setfillcolor(GREEN);
+    setfillcolor(body_color);
     for (size_t i = 1; i < snake_body.size(); i++) {
         Point p = snake_body[i];
         int sx = GET_X(p.x);
@@ -87,7 +87,7 @@ void UseEasyX::drawSnake(const std::deque<Point>& snake_body)
     }
 
     // 2. ª≠…ﬂÕ∑
-    setfillcolor(LIGHTGREEN);
+    setfillcolor(head_color);
     Point head = snake_body.front();
     int hx = GET_X(head.x);
     int hy = GET_Y(head.y);

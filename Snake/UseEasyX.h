@@ -16,7 +16,7 @@ public:
     void drawUI(int current_score, int high_score, int snake_len, int hp, int game_time_seconds, bool is_paused);
 
     void drawMap(GameMap& map);
-    void drawSnake(const std::deque<Point>& snake_body);
+    void drawSnake(const std::deque<Point>& snake_body, COLORREF body_color, COLORREF head_color);
     void drawGameOver(int final_score);
 
     // 【修改】菜单现在返回 1-5 (包含历史和退出)

@@ -1,4 +1,5 @@
 #pragma once
+
 #include "DataStructure.h"
 #include "Snake.h"
 #include "GameMap.h"
@@ -28,9 +29,10 @@ protected:
 
 public:
     GameBase();
+    GameBase(int x, int y, Direction d);
     virtual ~GameBase() {}
 
-    void run(); // 主循环
+    virtual void run(); // 主循环
 
 protected:
     // 核心虚函数 (smallCamel)
@@ -40,7 +42,6 @@ protected:
     virtual void update();
 
     // 统一渲染
-    virtual void render();
     virtual std::string getVersionName() const = 0;
 };
 
@@ -66,4 +67,16 @@ public:
 protected:
     void onSnakeDie() override;
     std::string getVersionName() const override { return "Expert"; }
+};
+
+class DualGame : public GameBase {
+private:
+    Snake snake_2;
+public:
+    DualGame(int x_1, int y_1, Direction d_1, int x_2, int y_2, Direction d_2);
+    ~DualGame() {};
+    void run() override;
+protected:
+    void onSnakeDie() override;
+    void update() override;
 };

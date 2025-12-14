@@ -15,6 +15,24 @@ Snake::Snake()
     snake.push_back({ center_x - 2, center_y });  // 尾
 }
 
+Snake::Snake(int x, int y, Direction d)
+{
+    direction = d;
+
+    if (d == Direction::RIGHT)
+    {
+        snake.push_back({ x, y });      // 头
+        snake.push_back({ x - 1, y });  // 身
+        snake.push_back({ x - 2, y });  // 尾
+    }
+    else 
+    {
+        snake.push_back({ x, y });      // 头
+        snake.push_back({ x + 1, y });  // 身
+        snake.push_back({ x + 2, y });  // 尾
+    }
+}
+
 Snake::~Snake() {}
 
 // 【关键修复】获取下个位置（只预测，不移动）
