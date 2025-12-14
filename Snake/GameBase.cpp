@@ -375,6 +375,7 @@ void ExpertGame::onSnakeDie()
 DualGame::DualGame(int x_1, int y_1, Direction d_1, int x_2, int y_2, Direction d_2):
     GameBase(12,9,Direction::RIGHT),snake_2(20, 9, Direction::LEFT)
 {
+    score_2 = 0; // 【新增】记录 P2 的分数
     winner = 0; // 初始化为平局
     hp = 0;     // 双人模式不需要 HP
 }
@@ -419,7 +420,7 @@ void DualGame::run()
                     }
                     // 立即重绘一次UI
                     int dt = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
-                    renderer.drawUI(current_score, highest_score, snake.getLength(), hp, dt, is_paused);
+                    renderer.drawDualUI(current_score, score_2, dt, is_paused);
                 }
                 else if (action == 2) { // 立即退出
                     renderer.close();
@@ -474,7 +475,7 @@ void DualGame::run()
                         pause_start = std::time(nullptr);
 
                         int dt = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
-                        renderer.drawUI(current_score, highest_score, snake.getLength(), hp, dt, is_paused);
+                        renderer.drawDualUI(current_score, score_2, dt, is_paused);
 
                         should_break_wait = true; // 标记需要跳出外层
                         break; // 跳出 MouseHit 循环
@@ -504,7 +505,7 @@ void DualGame::run()
         renderer.drawMap(map);
         renderer.drawSnake(snake.getBody(), GREEN, LIGHTGREEN);
         renderer.drawSnake(snake_2.getBody(), BLUE, LIGHTBLUE);
-        renderer.drawUI(current_score, highest_score, snake.getLength(), hp, display_time, false);
+        renderer.drawDualUI(current_score, score_2, display_time, false);
     }
 
     // 游戏结束结算
@@ -577,7 +578,7 @@ void DualGame::update()
     if (t2 == BlockType::FOOD) {
         snake_2.addSnake();
         food.eatFood(p2_next);
-        // 这里没有变量存 P2 分数，可以在 DualGame 加一个 int score2，或者暂时忽略
+        score_2 += 10; // 【新增】P2 得分 +10
     }
     else {
         Point tail = snake_2.getBody().back();
