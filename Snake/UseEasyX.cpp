@@ -5,6 +5,8 @@
 #include <windows.h> // 用于 Sleep, GetAsyncKeyState
 #include <stdio.h>
 #include <graphics.h>
+#include <ctime>
+#include <cstdlib>
 
 
 
@@ -22,19 +24,27 @@ const int BTN_PAUSE_Y = 10;
 
 bool UseEasyX::is_graph_initialized = false;
 
+// 辅助函数：获取鼠标位置（用于悬停效果，不消耗点击事件）
+POINT getMousePos() {
+    POINT p;
+    GetCursorPos(&p);
+    ScreenToClient(GetHWnd(), &p);
+    return p;
+}
+
 void UseEasyX::initGraph(int width, int height)
 {
     if (!is_graph_initialized)
     {
         initgraph(width, height);
-
-        // 开启双缓冲，且永远不关闭它，防止闪烁和状态错乱
         BeginBatchDraw();
-
         is_graph_initialized = true;
     }
 
-    // 设置背景透明 (这个操作是安全的，可以重复调用)
+    // 设置 VA-11 HALL-A 风格背景
+    setbkcolor(VA_BG_COLOR);
+    cleardevice(); // 立即应用背景色
+
     setbkmode(TRANSPARENT);
 }
 
@@ -46,30 +56,123 @@ void UseEasyX::close()
 
 void UseEasyX::drawMap(GameMap& map)
 {
+    // 每次清除屏幕使用深色背景
+    setbkcolor(VA_BG_COLOR);
     cleardevice();
+
+    // 可选：绘制淡淡的背景网格线，增加赛博感
+    setlinecolor(RGB(35, 30, 50));
+    for (int i = 0; i < SCREEN_WIDTH; i += BLOCK_SIZE) line(i, 0, i, SCREEN_HEIGHT);
+    for (int j = 0; j < SCREEN_HEIGHT; j += BLOCK_SIZE) line(0, j, SCREEN_WIDTH, j);
 
     for (int x = 0; x < MAP_WIDTH; x++) {
         for (int y = 0; y < MAP_HEIGHT; y++) {
             BlockType type = map.getBlock(x, y);
 
-            int screen_x = GET_X(x);
-            int screen_y = GET_Y(y);
+            int sx = GET_X(x);
+            int sy = GET_Y(y);
 
             switch (type) {
             case BlockType::WALL:
-                setfillcolor(LIGHTGRAY);
-                solidrectangle(screen_x, screen_y, screen_x + BLOCK_SIZE, screen_y + BLOCK_SIZE);
+                // 墙壁：空心矩形或带边框的深色块
+                setfillcolor(VA_WALL_COLOR);
+                setlinecolor(VA_WALL_BORDER);
+                fillrectangle(sx, sy, sx + BLOCK_SIZE, sy + BLOCK_SIZE);
+                // 画个叉或者内部装饰，看起来像原本的电子元件
+                line(sx, sy, sx + BLOCK_SIZE, sy + BLOCK_SIZE);
                 break;
 
             case BlockType::FOOD:
-                setfillcolor(RED);
-                solidcircle(screen_x + BLOCK_SIZE / 2, screen_y + BLOCK_SIZE / 2, BLOCK_SIZE / 2 - 2);
-                break;
+            {
+                // --- 赛博朋克风格：全息能量核心 ---
 
-            case BlockType::SNAKE_HEAD: // 确保 GameMap 有返回 HEAD 类型，或者在这里根据逻辑绘图
-                // 如果 GameMap 只存了 BODY，这里可能不会触发，通常在 drawSnake 处理
-                // 但如果你的 map setBlock 设置了 HEAD，这里也可以画
-                break;
+                // 1. 计算呼吸动画参数 (基于系统时间)
+                // 周期约 1秒，范围 0.0 ~ 1.0
+                long long t = GetTickCount();
+                double pulse = (sin(t * 0.005) + 1.0) / 2.0;
+
+                // 核心大小在 40% 到 60% 之间波动
+                int core_size = (int)(BLOCK_SIZE * (0.4 + 0.2 * pulse));
+                int offset = (BLOCK_SIZE - core_size) / 2;
+
+                // 2. 绘制发光核心 (霓虹粉)
+                setfillcolor(VA_NEON_PINK);
+                setlinecolor(VA_NEON_PINK);
+
+                // 画两个交错的图形形成复杂的“核心”感
+                // 图层A: 实心矩形
+                solidrectangle(sx + offset, sy + offset,
+                    sx + BLOCK_SIZE - offset, sy + BLOCK_SIZE - offset);
+
+                // 图层B: 旋转 45 度的线框 (菱形效果) - 简单模拟：画一个略大的空心圆或十字
+                setlinecolor(WHITE);
+                line(sx + BLOCK_SIZE / 2, sy + offset, sx + BLOCK_SIZE / 2, sy + BLOCK_SIZE - offset);
+                line(sx + offset, sy + BLOCK_SIZE / 2, sx + BLOCK_SIZE - offset, sy + BLOCK_SIZE / 2);
+
+                // 3. 绘制全息锁定框 (青色) - 像是一个 HUD 界面锁定了这个食物
+                COLORREF holo_cyan = RGB(0, 240, 255);
+                setlinecolor(holo_cyan);
+
+                int border_len = 8; // 边角线长度
+                int margin = 4;     // 距离格子的边距
+
+                // 左上角
+                line(sx + margin, sy + margin, sx + margin + border_len, sy + margin);
+                line(sx + margin, sy + margin, sx + margin, sy + margin + border_len);
+
+                // 右上角
+                line(sx + BLOCK_SIZE - margin, sy + margin, sx + BLOCK_SIZE - margin - border_len, sy + margin);
+                line(sx + BLOCK_SIZE - margin, sy + margin, sx + BLOCK_SIZE - margin, sy + margin + border_len);
+
+                // 左下角
+                line(sx + margin, sy + BLOCK_SIZE - margin, sx + margin + border_len, sy + BLOCK_SIZE - margin);
+                line(sx + margin, sy + BLOCK_SIZE - margin, sx + margin, sy + BLOCK_SIZE - margin - border_len);
+
+                // 右下角
+                line(sx + BLOCK_SIZE - margin, sy + BLOCK_SIZE - margin, sx + BLOCK_SIZE - margin - border_len, sy + BLOCK_SIZE - margin);
+                line(sx + BLOCK_SIZE - margin, sy + BLOCK_SIZE - margin, sx + BLOCK_SIZE - margin, sy + BLOCK_SIZE - margin - border_len);
+            }
+            break;
+
+            case BlockType::DATA_FRAG:
+            {
+                // --- 赛博故障风格设计 ---
+
+                // 1. 定义颜色：高亮金
+                COLORREF neon_gold = RGB(255, 215, 0);
+
+                // 2. 绘制 "故障" 外框 (Jitter Effect)
+                // 边框会随机向外扩散或收缩 1-2 像素，产生视觉上的震动感
+                int jitter = rand() % 3;
+                setlinecolor(neon_gold);
+                setfillcolor(BS_NULL); // 设为空心，防止覆盖背景网格太多
+
+                // 画主框
+                rectangle(sx + 5 - jitter, sy + 5 - jitter,
+                    sx + BLOCK_SIZE - 5 + jitter, sy + BLOCK_SIZE - 5 + jitter);
+
+                // 3. 绘制内部 "数据流" (Data Stream)
+                // 随机画几条白色的横线，模拟信号干扰
+                setlinecolor(WHITE);
+                for (int i = 8; i < BLOCK_SIZE - 8; i += 4) {
+                    // 50% 概率画线，让内部纹理每帧都在变
+                    if (rand() % 2 == 0) {
+                        line(sx + 8, sy + i, sx + BLOCK_SIZE - 8, sy + i);
+                    }
+                }
+
+                // 4. 绘制文字标识
+                // 文字偶尔会变成乱码颜色或者消失，增加 Glitch 感
+                if (rand() % 10 != 0) { // 90% 时间正常显示
+                    settextcolor(neon_gold);
+                    settextstyle(14, 0, _T("Consolas")); // 使用极小的终端字体
+
+                    // 居中显示 "0x" 或 "MEM" 暗示内存地址
+                    // 稍微错位一点点
+                    outtextxy(sx + 8, sy + 12, _T("0xFF"));
+                }
+            }
+            break;
 
             case BlockType::AIR:
             default:
@@ -85,33 +188,41 @@ void UseEasyX::drawSnake(const std::deque<Point>& snake_body, COLORREF body_colo
 
     // 1. 画蛇身
     setfillcolor(body_color);
+    setlinecolor(VA_BG_COLOR); // 用背景色做分割线，产生像素块的断裂感
     for (size_t i = 1; i < snake_body.size(); i++) {
         Point p = snake_body[i];
         int sx = GET_X(p.x);
         int sy = GET_Y(p.y);
-        solidrectangle(sx + 1, sy + 1, sx + BLOCK_SIZE - 1, sy + BLOCK_SIZE - 1);
+        // 稍微缩小一点，留出间隙
+        fillrectangle(sx + 2, sy + 2, sx + BLOCK_SIZE - 2, sy + BLOCK_SIZE - 2);
     }
 
-    // 2. 画蛇头
+    // 2. 画蛇头 (带一点高光)
     setfillcolor(head_color);
+    setlinecolor(WHITE); // 头部高亮边框
     Point head = snake_body.front();
     int hx = GET_X(head.x);
     int hy = GET_Y(head.y);
-    solidrectangle(hx, hy, hx + BLOCK_SIZE, hy + BLOCK_SIZE);
+    fillrectangle(hx + 1, hy + 1, hx + BLOCK_SIZE - 1, hy + BLOCK_SIZE - 1);
 
-    // 画眼睛
-    setfillcolor(BLACK);
-    solidcircle(hx + BLOCK_SIZE / 4, hy + BLOCK_SIZE / 4, 3);
-    solidcircle(hx + BLOCK_SIZE * 3 / 4, hy + BLOCK_SIZE / 4, 3);
+    // 画眼睛 (像素风)
+    setfillcolor(VA_BG_COLOR);
+    solidrectangle(hx + 8, hy + 8, hx + 12, hy + 12);
+    solidrectangle(hx + 28, hy + 8, hx + 32, hy + 12);
 }
 
 void UseEasyX::drawUI(int current_score, int high_score, int snake_len, int hp, int game_time_seconds, bool is_paused) {
+
+    settextcolor(VA_TEXT_COLOR);
+    settextstyle(28, 0, _T("Consolas")); // 或者 "Courier New"
+    setbkmode(TRANSPARENT);
+
     // 1. 绘制基本文字信息
     settextcolor(WHITE);
     settextstyle(24, 0, _T("Consolas"));
 
     TCHAR str_buf[128];
-    _stprintf_s(str_buf, _T("Score: %d  High: %d"), current_score, high_score);
+    _stprintf_s(str_buf, _T("[SCORE]: %06d  [HIGH]: %06d"), current_score, high_score); // 补零格式化更有科技感
     outtextxy(20, 20, str_buf);
 
     _stprintf_s(str_buf, _T("Length: %d  Time: %02d:%02d"), snake_len, game_time_seconds / 60, game_time_seconds % 60);
@@ -128,15 +239,15 @@ void UseEasyX::drawUI(int current_score, int high_score, int snake_len, int hp, 
     // 如果运行：显示 "PAUSE" (暂停)，背景棕色
     drawButton(BTN_PAUSE_X, BTN_PAUSE_Y, BTN_W, BTN_H,
         is_paused ? _T("RESUME") : _T("PAUSE"),
-        is_paused ? GREEN : BROWN);
+        is_paused ? VA_NEON_PINK : VA_ACCENT_COLOR); // 使用新变量
 
-    drawButton(BTN_RETURN_X, BTN_RETURN_Y, BTN_W, BTN_H, _T("MENU"), RED);
+    drawButton(BTN_RETURN_X, BTN_RETURN_Y, BTN_W, BTN_H, _T("MENU"), VA_WALL_BORDER);
 
     // 3. 【新增】绘制屏幕中央的暂停提示
     if (is_paused) {
         // 设置大号字体
-        settextstyle(80, 0, _T("Arial"));
-        settextcolor(YELLOW);
+        settextstyle(80, 0, _T("Impact")); // 更有冲击力的字体
+        settextcolor(VA_NEON_PINK);
 
         LPCTSTR p_text = _T("GAME PAUSED");
 
@@ -145,6 +256,12 @@ void UseEasyX::drawUI(int current_score, int high_score, int snake_len, int hp, 
         int text_h = textheight(p_text);
 
         outtextxy((SCREEN_WIDTH - text_w) / 2, (SCREEN_HEIGHT - text_h) / 2, p_text);
+
+        setlinecolor(RGB(0, 0, 0));
+        for (int i = 0; i < SCREEN_HEIGHT; i += 4) {
+            // 这里很难做半透明，可以用深灰色细线代替
+            line(0, i, SCREEN_WIDTH, i); 
+        }
     }
 
     FlushBatchDraw();
@@ -181,48 +298,6 @@ void UseEasyX::drawGameOver(int final_score)
     outtextxy(center_x - w / 2, center_y + 60, tip);
 
     FlushBatchDraw();
-}
-
-int UseEasyX::drawMenu() {
-    int btn_w = 300;
-    int btn_h = 50;
-    int start_y = 180; // 稍微上移一点
-    int gap = 60;      // 间距调小一点以容纳更多按钮
-    int center_x = (SCREEN_WIDTH - btn_w) / 2;
-
-    while (true) {
-        cleardevice();
-
-        // 标题
-        settextstyle(60, 0, _T("Arial"));
-        settextcolor(YELLOW);
-        LPCTSTR title = _T("SNAKE GAME C++");
-        outtextxy((SCREEN_WIDTH - textwidth(title)) / 2, 60, title);
-
-        // 绘制 6 个按钮
-        drawButton(center_x, start_y, btn_w, btn_h, _T("1. Intro Mode"), GREEN);
-        drawButton(center_x, start_y + gap, btn_w, btn_h, _T("2. Advanced Mode"), BLUE);
-        drawButton(center_x, start_y + gap * 2, btn_w, btn_h, _T("3. Expert Mode"), RED);
-        drawButton(center_x, start_y + gap * 3, btn_w, btn_h, _T("4. Dual Mode (1v1)"), MAGENTA); // 【新增】
-        drawButton(center_x, start_y + gap * 4, btn_w, btn_h, _T("History Records"), LIGHTGRAY);
-        drawButton(center_x, start_y + gap * 5, btn_w, btn_h, _T("Exit Game"), DARKGRAY);
-
-        FlushBatchDraw();
-
-        // 鼠标交互
-        if (MouseHit()) {
-            MOUSEMSG msg = GetMouseMsg();
-            if (msg.uMsg == WM_LBUTTONDOWN) {
-                if (isClickIn(msg.x, msg.y, center_x, start_y, btn_w, btn_h)) return 1;
-                if (isClickIn(msg.x, msg.y, center_x, start_y + gap, btn_w, btn_h)) return 2;
-                if (isClickIn(msg.x, msg.y, center_x, start_y + gap * 2, btn_w, btn_h)) return 3;
-                if (isClickIn(msg.x, msg.y, center_x, start_y + gap * 3, btn_w, btn_h)) return 4; // 双人
-                if (isClickIn(msg.x, msg.y, center_x, start_y + gap * 4, btn_w, btn_h)) return 5; // 历史
-                if (isClickIn(msg.x, msg.y, center_x, start_y + gap * 5, btn_w, btn_h)) return 6; // 退出
-            }
-        }
-        Sleep(10);
-    }
 }
 
 std::string UseEasyX::inputPlayerName()
@@ -323,19 +398,218 @@ void UseEasyX::drawRankings(const std::vector<Record>& records)
     }
 }
 
-void UseEasyX::drawButton(int x, int y, int w, int h, LPCTSTR text, COLORREF bg_color) {
-    setfillcolor(bg_color);
-    setlinecolor(WHITE);
-    fillrectangle(x, y, x + w, y + h); // 画带边框的矩形
 
-    setbkmode(TRANSPARENT);
-    settextcolor(WHITE);
+void UseEasyX::drawButton(int x, int y, int w, int h, LPCTSTR text, COLORREF theme_color) {
+    // 背景半透明黑 (EasyX不支持直接alpha，这里用实心黑覆盖地图)
+    setfillcolor(VA_BG_COLOR);
+    solidrectangle(x, y, x + w, y + h);
+
+    // 亮色边框
+    setlinecolor(theme_color);
+    rectangle(x, y, x + w, y + h);
+
+    // 内部再画一圈细线，增加细节
+    rectangle(x + 3, y + 3, x + w - 3, y + h - 3);
+
+    settextcolor(theme_color);
     settextstyle(20, 0, _T("Consolas"));
 
-    // 文字居中计算
+    // 文字居中
     int tx = x + (w - textwidth(text)) / 2;
     int ty = y + (h - textheight(text)) / 2;
     outtextxy(tx, ty, text);
+}
+
+int UseEasyX::drawMenu() {
+    // --- 菜单布局参数 ---
+    int menu_x = 700;
+    int start_y = 150;       // 保持上次调整的高度
+    int btn_w = 400;
+    int btn_h = 60;
+    int gap = 15;
+
+    // --- 动画状态变量 ---
+    int timer = 0;           // 帧计数器
+    int scan_line_y = 0;     // 扫描线位置
+    int grid_offset = 0;     // 网格滚动偏移
+
+    // 菜单项定义
+    const int ITEM_COUNT = 6;
+    struct MenuItem {
+        LPCTSTR text;
+        LPCTSTR desc;
+        COLORREF color;
+    };
+
+    MenuItem items[ITEM_COUNT] = {
+        { _T("1. SUGAR RUSH [INTRO]"),    _T("Casual mode. Don't die."),          RGB(0, 255, 255) },
+        { _T("2. MARSBLAST [ADVANCED]"),  _T("Walls are deadly. Respawn enabled."), RGB(0, 120, 255) },
+        { _T("3. FLAMING MOAI [EXPERT]"), _T("Bodies become food. 5 Lives."),     RGB(255, 42, 109) },
+        { _T("4. COBALT VELVET [DUAL]"),  _T("1v1 Local Multiplayer."),           RGB(180, 0, 255) },
+        { _T("5. DATABASE [HISTORY]"),    _T("Check past records."),              LIGHTGRAY },
+        { _T("6. SHUTDOWN [EXIT]"),       _T("Terminate program."),               DARKGRAY }
+    };
+
+    while (true) {
+        // --- 1. 更新动画状态 ---
+        timer++;
+
+        // 扫描线移动速度 (每帧 8 像素)
+        scan_line_y = (scan_line_y + 8) % SCREEN_HEIGHT;
+
+        // 网格缓慢滚动 (每 4 帧动 1 像素)
+        if (timer % 4 == 0) grid_offset = (grid_offset + 1) % 40;
+
+        // 随机故障参数生成 (3% 的概率发生故障)
+        bool is_glitch = (rand() % 30 == 0);
+        int glitch_x = is_glitch ? (rand() % 10 - 5) : 0;
+        int glitch_y = is_glitch ? (rand() % 6 - 3) : 0;
+        COLORREF title_shadow_color = is_glitch ? WHITE : VA_NEON_PINK; // 故障时阴影变白
+
+        // --- 2. 绘制背景层 ---
+        setbkcolor(VA_BG_COLOR);
+        cleardevice();
+
+        // 绘制滚动的网格 (增加动感)
+        setlinecolor(RGB(35, 30, 50));
+        // 竖线 (向右微动)
+        for (int i = -40; i < SCREEN_WIDTH; i += 40) {
+            line(i + grid_offset, 0, i + grid_offset, SCREEN_HEIGHT);
+        }
+        // 横线 (向下微动)
+        for (int j = -40; j < SCREEN_HEIGHT; j += 40) {
+            line(0, j + grid_offset, SCREEN_WIDTH, j + grid_offset);
+        }
+
+        // --- 3. 左侧：动态标题区 ---
+        settextstyle(100, 0, _T("Impact"));
+
+        // 阴影层 (带故障位移)
+        settextcolor(title_shadow_color);
+        outtextxy(105 + glitch_x, 155 + glitch_y, _T("SNAKE"));
+        outtextxy(105 - glitch_x, 255 - glitch_y, _T("PROTOCOL")); // 反向抖动
+
+        // 主体层 (正常位置)
+        // 如果正在故障，主体层偶尔消失一下 (模拟闪烁)
+        if (!is_glitch || (rand() % 2 == 0)) {
+            settextcolor(VA_ACCENT_COLOR);
+            outtextxy(100, 150, _T("SNAKE"));
+            outtextxy(100, 250, _T("PROTOCOL"));
+        }
+
+        // 装饰性小字
+        settextstyle(20, 0, _T("Consolas"));
+        settextcolor(WHITE);
+
+        // 动态数据
+        TCHAR time_buf[64];
+        _stprintf_s(time_buf, _T("SYS_TICK: %08d"), timer); // 显示不断跳动的数字
+        outtextxy(100, 380, _T("SYSTEM: ONLINE"));
+        outtextxy(100, 400, _T("MEM: 64KB OK"));
+        outtextxy(100, 420, time_buf);
+
+        // 分割线
+        setlinecolor(VA_ACCENT_COLOR);
+        line(600, 100, 600, 620);
+
+        // --- 4. 右侧：交互式菜单 ---
+        POINT mouse = getMousePos();
+        int hover_index = -1;
+
+        for (int i = 0; i < ITEM_COUNT; i++) {
+            int x = menu_x;
+            int y = start_y + i * (btn_h + gap);
+            bool is_hover = (mouse.x >= x && mouse.x <= x + btn_w && mouse.y >= y && mouse.y <= y + btn_h);
+
+            if (is_hover) hover_index = i;
+
+            if (is_hover) {
+                // 悬停：背景填充，文字变黑
+                setfillcolor(items[i].color);
+                solidrectangle(x, y, x + btn_w, y + btn_h);
+                settextcolor(BLACK);
+            }
+            else {
+                // 默认：黑背景，亮边框
+                setfillcolor(VA_BG_COLOR);
+                solidrectangle(x, y, x + btn_w, y + btn_h);
+                setlinecolor(items[i].color);
+                rectangle(x, y, x + btn_w, y + btn_h);
+                settextcolor(items[i].color);
+            }
+
+            settextstyle(30, 0, _T("Consolas"));
+            int tx = x + 20;
+            int ty = y + (btn_h - 30) / 2;
+            outtextxy(tx, ty, items[i].text);
+
+            // 悬停光标闪烁动画
+            if (is_hover) {
+                if ((timer / 10) % 2 == 0) { // 每10帧闪烁一次
+                    outtextxy(x - 30, ty, _T(">"));
+                }
+            }
+        }
+
+        // --- 5. 底部：动态描述栏 ---
+        // 绘制底部背景条
+        setfillcolor(RGB(20, 20, 20));
+        solidrectangle(0, SCREEN_HEIGHT - 60, SCREEN_WIDTH, SCREEN_HEIGHT);
+        setlinecolor(VA_ACCENT_COLOR);
+        line(0, SCREEN_HEIGHT - 60, SCREEN_WIDTH, SCREEN_HEIGHT - 60);
+
+        settextstyle(24, 0, _T("Consolas"));
+
+        if (hover_index != -1) {
+            settextcolor(WHITE);
+            outtextxy(20, SCREEN_HEIGHT - 40, items[hover_index].desc);
+        }
+        else {
+            // 待机文字呼吸效果 (根据 timer 计算灰度)
+            int brightness = 100 + abs((int)(sin(timer * 0.05) * 150));
+            if (brightness > 255) brightness = 255;
+            settextcolor(RGB(brightness, brightness, brightness));
+
+            // 每隔一段时间加上光标 "_"
+            bool show_cursor = (timer / 30) % 2 == 0;
+            if (show_cursor)
+                outtextxy(20, SCREEN_HEIGHT - 40, _T("WAITING FOR INPUT..._"));
+            else
+                outtextxy(20, SCREEN_HEIGHT - 40, _T("WAITING FOR INPUT..."));
+        }
+
+        // --- 6. 全局特效：CRT 扫描线 ---
+        // 画一条贯穿全屏的半透明亮线 (模拟扫描)
+        // EasyX 没有直接 Alpha，我们用“疏密线”模拟或者直接画一条暗青色线
+        setlinecolor(RGB(0, 50, 50));
+        line(0, scan_line_y, SCREEN_WIDTH, scan_line_y);
+        line(0, scan_line_y + 1, SCREEN_WIDTH, scan_line_y + 1); // 加粗一点
+
+        // 静态旧电视扫描纹理 (每隔2行画一条黑线，产生隔行扫描感)
+        setlinecolor(0);
+        for (int k = 0; k < SCREEN_HEIGHT; k += 4) {
+            // 慎用：如果在高分辨率下这可能会让屏幕太暗
+            // 这里可以不做处理，或者只在标题区域画
+        }
+
+        FlushBatchDraw();
+
+        // --- 7. 输入处理 ---
+        if (MouseHit()) {
+            MOUSEMSG msg = GetMouseMsg();
+            if (msg.uMsg == WM_LBUTTONDOWN) {
+                for (int i = 0; i < ITEM_COUNT; i++) {
+                    int x = menu_x;
+                    int y = start_y + i * (btn_h + gap);
+                    if (isClickIn(msg.x, msg.y, x, y, btn_w, btn_h)) {
+                        return i + 1;
+                    }
+                }
+            }
+        }
+
+        Sleep(16); // 约 60 FPS
+    }
 }
 
 bool UseEasyX::isClickIn(int mouse_x, int mouse_y, int x, int y, int w, int h) {

@@ -7,6 +7,25 @@
 #include <string>
 #include <vector>
 
+// --- VA-11 HALL-A 主题配色 ---
+// 背景色：深邃的午夜紫
+const COLORREF VA_BG_COLOR = RGB(22, 18, 35);
+// 墙壁颜色：稍亮的紫色网格
+const COLORREF VA_WALL_COLOR = RGB(59, 36, 66);
+const COLORREF VA_WALL_BORDER = RGB(100, 80, 120);
+// UI 文字颜色：复古终端绿
+const COLORREF VA_TEXT_COLOR = RGB(0, 255, 128);
+// 装饰线条/按钮边框：青色
+const COLORREF VA_ACCENT_COLOR = RGB(0, 240, 255);
+// 警告/高亮/食物：霓虹粉
+const COLORREF VA_NEON_PINK = RGB(255, 42, 109);
+// P1 蛇身：青色 (Jill 风格)
+const COLORREF VA_P1_BODY = RGB(0, 120, 140);
+const COLORREF VA_P1_HEAD = RGB(0, 255, 255);
+// P2 蛇身：红色/粉色 (Dorothy 风格)
+const COLORREF VA_P2_BODY = RGB(160, 0, 60);
+const COLORREF VA_P2_HEAD = RGB(255, 42, 109);
+
 class UseEasyX {
 public:
 

@@ -30,7 +30,8 @@ enum class BlockType{
 	SNAKE_HEAD,
 	SNAKE_BODY,
 	WALL,
-	FOOD
+	FOOD,
+	DATA_FRAG
 };
 
 enum class Direction{ 

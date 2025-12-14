@@ -16,6 +16,7 @@ public:
     void moveToNextPosition();
     Point getNextPosition();
     void addSnake();
+    void shrink(); // 缩短身体
 
     // 设置/获取方向
     void setDirection(Direction d);

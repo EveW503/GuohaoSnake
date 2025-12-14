@@ -89,7 +89,12 @@ void Food::generateFood(GameMap& map)
         if (success)
         {
             food_list.push_back({ x, y });
-            map.setBlock(BlockType::FOOD, x, y);
+            if (rand() % 5 == 0) {
+                map.setBlock(BlockType::DATA_FRAG, x, y);
+            }
+            else {
+                map.setBlock(BlockType::FOOD, x, y);
+            }
         }
     }
 }

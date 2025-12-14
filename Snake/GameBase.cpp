@@ -129,7 +129,7 @@ void GameBase::run() {
         // 渲染
         int display_time = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
         renderer.drawMap(map);
-        renderer.drawSnake(snake.getBody(), GREEN, LIGHTGREEN);
+        renderer.drawSnake(snake.getBody(), RGB(0, 120, 140), RGB(0, 255, 255));
         renderer.drawUI(current_score, highest_score, snake.getLength(), hp, display_time, false);
     }
 
@@ -160,25 +160,46 @@ void GameBase::update()
         // 撞墙或撞自身 -> 触发死亡逻辑 (多态)
         onSnakeDie();
     }
-    else if (type == BlockType::FOOD)
+    else if (type == BlockType::FOOD || type == BlockType::DATA_FRAG)
     {
         // --- 吃食物逻辑 ---
 
-        // 1. 蛇变长 (只增不删)
+        // 1. 如果是数据碎片，先缩短
+        if (type == BlockType::DATA_FRAG) {
+            // 先把当前的蛇尾巴在地图上清除掉 (否则缩短后地图上会残留尾巴的影子)
+            // 简单暴力的做法：遍历当前蛇身设为 AIR，缩短后再画回去
+            // 或者只清除尾部这几节。
+            // 为了代码简单，我们利用 UseEasyX 每次重绘全图的特性，
+            // 这里主要负责更新逻辑数据，地图数据 sync 稍微麻烦点。
+
+            // 正确做法：手动清除地图上的旧尾巴
+            const std::deque<Point>& old_body = snake.getBody();
+            // 倒序清除最后 3 个
+            int cut_count = 0;
+            for (auto it = old_body.rbegin(); it != old_body.rend(); ++it) {
+                if (cut_count >= 3) break;
+                map.setBlock(BlockType::AIR, it->x, it->y);
+                cut_count++;
+            }
+
+            snake.shrink(); // 物理变短
+            current_score += 50; // 特殊道具加分更多！
+        }
+        else {
+            current_score += 10;
+        }
+
+        // 2. 蛇变长 (只增不删) -> 注意：shrink 后这里又 addSnake，相当于净减 2 节
         snake.addSnake();
 
-        // 2. 维护地图数据: 新头的位置设为 SNAKE_HEAD，旧头设为 BODY
-        // (注意：这里需要处理旧头变身体的显示逻辑，addSnake内部实现应由Snake类保证，
-        // 但为了地图同步，我们需要手动设置新头)
+        // 3. 维护地图数据
         map.setBlock(BlockType::SNAKE_HEAD, next_pos.x, next_pos.y);
-        // 获取旧头位置并设为 BODY (略，由渲染层或下一次循环覆盖)
 
-        // 3. 维护食物状态
-        food.eatFood(next_pos); // 从数组移除
-        current_score += 10;    // 加分
+        // 4. 维护食物状态
+        food.eatFood(next_pos);
         if (current_score > highest_score) highest_score = current_score;
 
-        // 4. 补货
+        // 5. 补货
         if (food.getCount() == 0)
         {
             food.generateFood(map);
@@ -508,8 +529,8 @@ void DualGame::run()
         // 渲染
         int display_time = static_cast<int>(std::time(nullptr) - start_time - pause_duration);
         renderer.drawMap(map);
-        renderer.drawSnake(snake.getBody(), GREEN, LIGHTGREEN);
-        renderer.drawSnake(snake_2.getBody(), BLUE, LIGHTBLUE);
+        renderer.drawSnake(snake.getBody(), RGB(0, 120, 140), RGB(0, 255, 255));
+        renderer.drawSnake(snake_2.getBody(), RGB(160, 0, 60), RGB(255, 42, 109));
         renderer.drawDualUI(current_score, score_2, display_time, false);
     }
 

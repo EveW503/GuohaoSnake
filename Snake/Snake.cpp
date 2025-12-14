@@ -81,6 +81,17 @@ void Snake::addSnake()
     snake.push_front(new_head);
 }
 
+void Snake::shrink()
+{
+    // 只有长度大于 5 才允许缩短，防止减没了
+    if (snake.size() > 5) {
+        // 移除尾部 3 节
+        for (int i = 0; i < 3 && snake.size() > 5; i++) {
+            snake.pop_back();
+        }
+    }
+}
+
 // 设置方向（含防自杀逻辑的底层支持，虽然 GameBase 也有检查）
 void Snake::setDirection(Direction d)
 {
