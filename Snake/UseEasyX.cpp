@@ -342,57 +342,199 @@ int UseEasyX::checkGameButtons(int mouse_x, int mouse_y) {
 }
 
 // 绘制历史记录 (带返回按钮)
-void UseEasyX::drawHistory(const std::vector<Record>& records) {
-    int btn_w = 150;
-    int btn_x = (SCREEN_WIDTH - btn_w) / 2;
+void UseEasyX::drawHistory(RecordManager& mgr) {
+    // 定义按钮参数
+    int btn_w = 120;
+    int btn_h = 40;
+    int start_x = 50;
     int btn_y = SCREEN_HEIGHT - 80;
+    int gap = 20;
+
+    // 按钮 X 坐标
+    int x_add = start_x;
+    int x_del = x_add + btn_w + gap;
+    int x_mod = x_del + btn_w + gap;
+    int x_search = x_mod + btn_w + gap;
+    int x_back = SCREEN_WIDTH - btn_w - 50;
+
+    // 搜索状态
+    bool is_searching = false;
+    std::vector<Record> search_result;
 
     while (true) {
         cleardevice();
 
-        // 标题
-        settextstyle(50, 0, _T("Arial"));
+        // 1. 标题
+        settextstyle(40, 0, _T("Arial"));
         settextcolor(YELLOW);
-        LPCTSTR title = _T("HALL OF FAME");
-        outtextxy((SCREEN_WIDTH - textwidth(title)) / 2, 50, title);
+        LPCTSTR title = is_searching ? _T("SEARCH RESULTS") : _T("RECORD MANAGEMENT");
+        outtextxy((SCREEN_WIDTH - textwidth(title)) / 2, 30, title);
 
-        // 表头
-        settextstyle(30, 0, _T("Consolas"));
+        // 2. 表头
+        settextstyle(24, 0, _T("Consolas"));
         settextcolor(LIGHTCYAN);
-        outtextxy(200, 150, _T("VERSION"));
-        outtextxy(500, 150, _T("NAME"));
-        outtextxy(900, 150, _T("SCORE"));
+        // 显示 INDEX 方便删除
+        outtextxy(100, 100, _T("ID"));
+        outtextxy(200, 100, _T("VERSION"));
+        outtextxy(500, 100, _T("NAME"));
+        outtextxy(900, 100, _T("SCORE"));
 
-        // 列表
+        // 3. 列表内容
         settextcolor(WHITE);
-        int y = 200;
+        int y = 140;
+
+        // 根据状态决定显示全表还是搜索结果
+        const std::vector<Record>& list_to_show = is_searching ? search_result : mgr.getAllRecords();
+
         int count = 0;
-        for (const auto& rec : records) {
-            if (count >= 10) break;
+        for (size_t i = 0; i < list_to_show.size(); ++i) {
+            if (count >= 12) break; // 每页最多显示12条
+
+            const auto& rec = list_to_show[i];
 
             TCHAR buf[128];
+
+            // 显示 ID (如果是搜索结果，显示它在原列表的索引可能比较复杂，这里简化显示当前视图的序号)
+            // 为了删除功能的准确性，建议在非搜索模式下才显示真实 ID
+            if (!is_searching) {
+                _stprintf_s(buf, _T("%d"), (int)i);
+                outtextxy(100, y, buf);
+            }
+            else {
+                outtextxy(100, y, _T("-"));
+            }
+
+            // 版本
             _stprintf_s(buf, _T("%-15S"), rec.version.c_str());
             outtextxy(200, y, buf);
-            _stprintf_s(buf, _T("%-15S"), rec.user_name.c_str());
+
+            // 名字 (带截断保护)
+            std::string safe_name = rec.user_name;
+            if (safe_name.length() > 20) safe_name = safe_name.substr(0, 20) + "...";
+            _stprintf_s(buf, _T("%-20S"), safe_name.c_str());
             outtextxy(500, y, buf);
+
+            // 分数
             _stprintf_s(buf, _T("%d"), rec.score);
             outtextxy(900, y, buf);
 
-            y += 40;
+            y += 35;
             count++;
         }
 
-        // 绘制返回按钮
-        drawButton(btn_x, btn_y, btn_w, 50, _T("BACK"), DARKGRAY);
+        // 4. 绘制功能按钮
+        if (!is_searching) {
+            drawButton(x_add, btn_y, btn_w, btn_h, _T("ADD"), GREEN);
+            drawButton(x_del, btn_y, btn_w, btn_h, _T("DELETE"), RED);
+            drawButton(x_mod, btn_y, btn_w, btn_h, _T("MODIFY"), BLUE);
+            drawButton(x_search, btn_y, btn_w, btn_h, _T("SEARCH"), BROWN);
+        }
+
+        // 返回按钮
+        drawButton(x_back, btn_y, btn_w, btn_h, is_searching ? _T("RESET") : _T("BACK"), DARKGRAY);
 
         FlushBatchDraw();
 
-        // 鼠标检测
+        // 5. 交互逻辑
         if (MouseHit()) {
             MOUSEMSG msg = GetMouseMsg();
             if (msg.uMsg == WM_LBUTTONDOWN) {
-                // 点击返回按钮退出
-                if (isClickIn(msg.x, msg.y, btn_x, btn_y, btn_w, 50)) break;
+
+                // --- 返回 / 重置 ---
+                if (isClickIn(msg.x, msg.y, x_back, btn_y, btn_w, btn_h)) {
+                    if (is_searching) {
+                        is_searching = false; // 退出搜索模式
+                    }
+                    else {
+                        break; // 退出历史界面
+                    }
+                }
+
+                // (仅在非搜索模式下可用)
+                if (!is_searching) {
+
+                    // --- 增 (ADD) ---
+                    if (isClickIn(msg.x, msg.y, x_add, btn_y, btn_w, btn_h)) {
+                        TCHAR name_buf[32] = { 0 };
+                        InputBox(name_buf, 32, _T("Enter Name:"), _T("Add Record"), _T("TestUser"), 0, 0, false);
+
+                        TCHAR score_buf[32] = { 0 };
+                        InputBox(score_buf, 32, _T("Enter Score:"), _T("Add Record"), _T("100"), 0, 0, false);
+
+                        // 转换并添加
+#ifdef UNICODE
+// 简单转换，实际项目建议封装辅助函数
+                        int len = WideCharToMultiByte(CP_ACP, 0, name_buf, -1, NULL, 0, NULL, NULL);
+                        char* n_ptr = new char[len];
+                        WideCharToMultiByte(CP_ACP, 0, name_buf, -1, n_ptr, len, NULL, NULL);
+                        std::string name_str(n_ptr);
+                        delete[] n_ptr;
+#else
+                        std::string name_str(name_buf);
+#endif
+
+                        int score_val = _ttoi(score_buf);
+                        mgr.addRecord("Manual", name_str, score_val);
+                    }
+
+                    // --- 删 (DELETE) ---
+                    if (isClickIn(msg.x, msg.y, x_del, btn_y, btn_w, btn_h)) {
+                        TCHAR idx_buf[32] = { 0 };
+                        InputBox(idx_buf, 32, _T("Enter ID (Index) to Delete:"), _T("Delete Record"), _T("0"), 0, 0, false);
+                        int idx = _ttoi(idx_buf);
+                        mgr.deleteRecord(idx);
+                    }
+
+                    // --- 改 (MODIFY) ---
+                    if (isClickIn(msg.x, msg.y, x_mod, btn_y, btn_w, btn_h)) {
+                        TCHAR old_buf[32] = { 0 };
+                        InputBox(old_buf, 32, _T("Enter Exact Old Username:"), _T("Modify Name"), _T(""), 0, 0, false);
+
+                        TCHAR new_buf[32] = { 0 };
+                        InputBox(new_buf, 32, _T("Enter New Username:"), _T("Modify Name"), _T(""), 0, 0, false);
+
+                        // 转换逻辑
+                        std::string old_s, new_s;
+#ifdef UNICODE
+                        // 这里省略重复的转换代码，原理同上，将 TCHAR 转为 std::string
+                        // 建议: 在 UseEasyX 类里增加一个 private 的 TcharToString 函数
+                        {
+                            int l = WideCharToMultiByte(CP_ACP, 0, old_buf, -1, NULL, 0, NULL, NULL);
+                            char* p = new char[l];
+                            WideCharToMultiByte(CP_ACP, 0, old_buf, -1, p, l, NULL, NULL);
+                            old_s = p; delete[] p;
+
+                            l = WideCharToMultiByte(CP_ACP, 0, new_buf, -1, NULL, 0, NULL, NULL);
+                            p = new char[l];
+                            WideCharToMultiByte(CP_ACP, 0, new_buf, -1, p, l, NULL, NULL);
+                            new_s = p; delete[] p;
+                        }
+#else
+                        old_s = old_buf; new_s = new_buf;
+#endif
+
+                        mgr.modifyUserName(old_s, new_s);
+                    }
+
+                    // --- 查 (SEARCH) ---
+                    if (isClickIn(msg.x, msg.y, x_search, btn_y, btn_w, btn_h)) {
+                        TCHAR search_buf[32] = { 0 };
+                        InputBox(search_buf, 32, _T("Enter Username to Search:"), _T("Search"), _T(""), 0, 0, false);
+
+                        std::string target_name;
+#ifdef UNICODE
+                        int len = WideCharToMultiByte(CP_ACP, 0, search_buf, -1, NULL, 0, NULL, NULL);
+                        char* p = new char[len];
+                        WideCharToMultiByte(CP_ACP, 0, search_buf, -1, p, len, NULL, NULL);
+                        target_name = p; delete[] p;
+#else
+                        target_name = search_buf;
+#endif
+
+                        search_result = mgr.searchRecords(target_name);
+                        is_searching = true; // 进入搜索结果显示模式
+                    }
+                }
             }
         }
         Sleep(10);

@@ -27,7 +27,7 @@ public:
     void drawRankings(const std::vector<Record>& records);
 
     // 【新增】绘制历史记录界面
-    void drawHistory(const std::vector<Record>& records);
+    void drawHistory(RecordManager& mgr);
 
     // 【新增】检查游戏内按钮点击 (返回 0:无, 1:暂停, 2:返回菜单)
     int checkGameButtons(int mouse_x, int mouse_y);

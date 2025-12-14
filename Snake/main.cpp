@@ -20,8 +20,7 @@ int main()
         if (choice == 4) { // 查看历史记录
             RecordManager temp_mgr; // 临时创建一个管理器读取数据
             temp_mgr.loadRecords();
-            menu.drawRankings(temp_mgr.getAllRecords());
-            menu.close();
+            menu.drawHistory(temp_mgr);
             continue; // 回到循环开头重新显示菜单
         }
 
